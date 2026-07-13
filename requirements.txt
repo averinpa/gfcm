@@ -1,0 +1,30 @@
+# Pinned to the benchmark image's `pip freeze`.
+# The Docker image is the byte-identical environment; this file is for a local (non-Docker)
+# reproduction of the GFCM + citests-family columns. The R (BLITZ, par_cop) and Java (FFCI)
+# competitors are only available inside the Docker image (see docker/).
+
+# --- core: GFCM test + runners + aggregation + figures (pure Python) ---
+numpy==1.26.4
+scipy==1.17.1
+pandas==3.0.3
+scikit-learn==1.9.0
+pyarrow==24.0.0
+matplotlib==3.10.9
+bnmetrics==0.2.2
+
+# suite packages (versions match the benchmark image)
+dagsampler==0.4.0
+citests==0.1.0
+# cbcd is not on PyPI -- install from the suite monorepo, pinned to the image-build commit.
+cbcd @ git+https://github.com/averinpa/constraint-based-causal-discovery-suite.git@afd7a9d6167c7a1fcc319fd0866beee02685129e#subdirectory=cbcd
+
+# --- competitor extras: the citests-family tests (RCoT, boosted GCM, ci_mm, ...) ---
+# (BLITZ, par_cop need R; FFCI needs the Tetrad jar + a JRE -- Docker only.)
+causal-learn==0.1.4.7
+xgboost==3.2.0
+statsmodels==0.14.6
+tigramite==5.2.10.1
+numba==0.65.1
+rpy2==3.6.4
+pycomets @ git+https://github.com/shimenghuang/pycomets.git@6dc2e2cdf12bcad4a0ff7ba98b0e3bc97cb89cb3
+causalchamber==0.2.8   # real light-tunnel data for the tab:cc-inject reconstruction

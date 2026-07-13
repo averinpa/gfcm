@@ -1,0 +1,15 @@
+# Build context is the repo root (docker build -f docker/Dockerfile .). Keep the image lean and
+# deterministic: exclude generated data, VCS, caches, and local artifacts from `COPY . /work`.
+.git
+.gitignore
+data/
+results/aggregated/*.parquet
+figures/*.pdf
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+notebooks/
+*.log
+.DS_Store

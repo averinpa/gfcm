@@ -1,0 +1,19 @@
+cff-version: 1.2.0
+message: "If you use this code, please cite the paper below."
+title: "GFCM: A Tail-Sensitive Mixed-Type Conditional Independence Test for Causal Discovery (reproduction archive)"
+authors:
+  - family-names: Averin
+    given-names: Pavel
+    affiliation: "University of Nicosia"
+    email: averinjr@gmail.com
+repository-code: "https://github.com/averinpa/gfcm"
+license: MIT
+preferred-citation:
+  type: article
+  title: "GFCM: A Tail-Sensitive Mixed-Type Conditional Independence Test for Causal Discovery"
+  authors:
+    - family-names: Averin
+      given-names: Pavel
+      affiliation: "University of Nicosia"
+  year: 2026
+  # journal / volume / doi: fill in when published
