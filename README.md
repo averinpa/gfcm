@@ -193,8 +193,8 @@ optional and only worth doing *at release* (a public image is free; a private 5 
 ## Provenance / pinning
 
 - Base image: `python:3.11.15-bookworm@sha256:091f0798…` (pinned by digest)
-- `dagsampler==0.4.0`, `citests==0.1.0`, `bnmetrics==0.2.2`, `causalchamber==0.2.8` — PyPI
-- `cbcd` — suite monorepo `constraint-based-causal-discovery-suite` @ `afd7a9d` (`#subdirectory=cbcd`)
+- `dagsampler==0.4.0`, `bnmetrics==0.2.2`, `causalchamber==0.2.8` — PyPI
+- `citests`, `cbcd` — suite monorepo `constraint-based-causal-discovery-suite` @ `9797d5a` (`#subdirectory=citests` / `=cbcd`). citests is pinned from source, **not** PyPI: the benchmark's GCM uses a `reg=` nuisance selector (`linear`/`xgb`/…) that the same-numbered PyPI `citests==0.1.0` does not have.
 - `py-tetrad` @ `acd876e8` — its `tetrad-current.jar` has md5 `03ae7e21f1fed311dc93e9782dd684ad` (build-time verified)
 - R packages: CRAN bookworm snapshot + `ericstrobl/RCIT`, `ericstrobl/BLITZ`
 

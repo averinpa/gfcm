@@ -5,9 +5,10 @@
 # the suite packages (dagsampler, citests, cbcd, bnmetrics). This is the multi-language
 # environment the competitor tests need; GFCM itself needs only the Python layer.
 #
-# Fully pinned: base image by digest; dagsampler 0.4.0 + citests 0.1.0 + bnmetrics 0.2.2 +
-# causalchamber 0.2.8 (PyPI); cbcd @ suite monorepo commit afd7a9d (subdirectory=cbcd);
-# py-tetrad @ acd876e (its tetrad-current.jar has the benchmark md5 03ae7e21f1fed311dc93e9782dd684ad).
+# Fully pinned: base image by digest; dagsampler 0.4.0 + bnmetrics 0.2.2 + causalchamber 0.2.8
+# (PyPI); citests + cbcd @ suite monorepo commit 9797d5a (subdirectory=citests / =cbcd -- citests
+# is the reg-API/pycomets build, NOT the same-numbered PyPI 0.1.0); py-tetrad @ acd876e (its
+# tetrad-current.jar has the benchmark md5 03ae7e21f1fed311dc93e9782dd684ad).
 
 FROM python:3.11.15-bookworm@sha256:091f0798d4b3b866c8fadb845cca7f96cd18f69b8aa8c05feadd60502fb00a75
 
@@ -59,8 +60,8 @@ RUN pip install --upgrade pip \
 # --- suite packages: dagsampler (PyPI), bnmetrics (PyPI), citests + cbcd (source-only, pin SHAs) ---
 RUN pip install "dagsampler==0.4.0" \
     && pip install --no-deps "bnmetrics==0.2.2" \
-    && pip install --no-deps "citests==0.1.0" \
-    && pip install "cbcd @ git+https://github.com/averinpa/constraint-based-causal-discovery-suite.git@afd7a9d6167c7a1fcc319fd0866beee02685129e#subdirectory=cbcd" \
+    && pip install --no-deps "citests @ git+https://github.com/averinpa/constraint-based-causal-discovery-suite.git@9797d5a280c2fd067e2db61a41baa7f6d8da08b8#subdirectory=citests" \
+    && pip install "cbcd @ git+https://github.com/averinpa/constraint-based-causal-discovery-suite.git@9797d5a280c2fd067e2db61a41baa7f6d8da08b8#subdirectory=cbcd" \
     && pip install jpype1
 
 # --- Tetrad / FFCI: Temurin 21 JRE (the jar is class version 65) + py-tetrad ---
