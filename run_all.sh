@@ -48,32 +48,45 @@ mkdir -p out/data out/results
 run() { docker run --rm -v "$PWD/out/data":/work/data -v "$PWD/out/results":/work/results "$IMAGE" "$@"; }
 PANEL=gfcm,ffci,blitz,rcot,gcm_boosted,par_cop
 
+# fan LABEL CMD...  -- run CMD across $JOBS worker containers when JOBS>1, else serially.
+# ONLY for the claim-safe phases (run_cells and convergence both go through run_cells.run_cell,
+# which atomically claims each (cell,test) via a .claim file, so parallel workers never duplicate
+# work and the seeded output is bit-identical to a serial run). Do NOT use for phases that are not
+# claim-coordinated, or for speed (whose timings must be measured uncontended).
+fan() {
+  local label="$1"; shift
+  if [ "$JOBS" -gt 1 ]; then
+    echo "[$(date)]   ($label) fanning across $JOBS workers"
+    for i in $(seq 1 "$JOBS"); do
+      run "$@" >>"out/${label}_worker_$i.log" 2>&1 &
+    done
+    wait
+  else
+    run "$@"
+  fi
+}
+
 # run_cells: NO --panel here on purpose. Each cell carries its own panel in the manifest
 # (par_cop is intentionally excluded at n=1e5, where it stalls for hours). Passing --panel
 # would override every cell and force par_cop onto the large-n cells.
 echo "[$(date)] === FULL: run_cells (5.2-5.5 tables)  JOBS=$JOBS ==="
-if [ "$JOBS" -gt 1 ]; then
-  for i in $(seq 1 "$JOBS"); do
-    run python experiments/run_cells.py >>"out/run_cells_worker_$i.log" 2>&1 &
-  done
-  wait
-else
-  run python experiments/run_cells.py
-fi
+fan run_cells python experiments/run_cells.py
 
-echo "[$(date)] === FULL: convergence (5.6) ==="
-# gcm_boosted and par_cop are n-capped inside run_convergence.py (20000 / 10000) — they appear
-# in the convergence table only up to their cap; the rest of the panel runs the full grid.
-run python experiments/run_convergence.py --panel gfcm,ffci,blitz,rcot,gcm_boosted,par_cop
-echo "[$(date)] === FULL: pc discovery (5.8/5.10) ==="
+# convergence: claim-safe (same run_cell), so it fans too. gcm_boosted and par_cop are n-capped
+# inside run_convergence.py (20000 / 10000); the rest of the panel runs the full grid to 1e5.
+echo "[$(date)] === FULL: convergence (5.6)  JOBS=$JOBS ==="
+fan convergence python experiments/run_convergence.py --panel "$PANEL"
+
+# The remaining phases run serially: they are not claim-coordinated, and speed must be uncontended.
+echo "[$(date)] === FULL: pc discovery (5.8/5.10) [serial] ==="
 run python experiments/run_pc.py           --panel "$PANEL"
-echo "[$(date)] === FULL: ablation (appendix) ==="
+echo "[$(date)] === FULL: ablation (appendix) [serial] ==="
 run python experiments/run_ablation.py
-echo "[$(date)] === FULL: injection (tab:inject, EuStock) ==="
+echo "[$(date)] === FULL: injection (tab:inject, EuStock) [serial] ==="
 run python experiments/run_injection.py    --panel "$PANEL"
-echo "[$(date)] === FULL: cc_injection (tab:cc-inject) ==="
+echo "[$(date)] === FULL: cc_injection (tab:cc-inject) [serial] ==="
 run python experiments/run_cc_injection.py --panel gfcm,rcot,gcm_boosted,fisherz
-echo "[$(date)] === FULL: speed (fig:speed) ==="
+echo "[$(date)] === FULL: speed (fig:speed) [serial — timings must be uncontended] ==="
 run python experiments/run_speed.py --panel gfcm,ffci,blitz,rcot,gcm_boosted
 
 echo "[$(date)] === aggregate -> results tables ==="
