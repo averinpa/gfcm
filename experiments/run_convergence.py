@@ -33,6 +33,12 @@ INTEREST = [
 DEFAULT_NGRID = [500, 1000, 1500, 2000, 2500, 3000, 4000, 5000,
                  7000, 10000, 15000, 20000, 50000, 100000]
 
+# Per-test cap on n in the convergence sweep. These competitors are too slow / unstable at large
+# n to be informative there (par_cop's quantile-regression R server stalls for hours at n>=1e4;
+# the xgb-nuisance boosted-GCM degrades past ~2e4), so each is swept only up to its cap while the
+# rest of the panel runs the full grid. Tests absent from this map run every n in the grid.
+NCAP = {"gcm_boosted": 20000, "par_cop": 10000}
+
 
 def _zq(dS):
     return ("X", "Y", [f"Z{i}" for i in range(1, dS + 1)])
@@ -71,7 +77,10 @@ def main():
     print(f"convergence: {len(INTEREST)} families x {len(ds_grid)} depths x {len(grid)} n-values, "
           f"panel {panel} = {len(units)} cell-runs -> {RC.OUT}", flush=True)
     for cell in units:
-        RC.run_cell(cell, panel, args.reps)
+        cell_panel = [t for t in panel if cell["n"] <= NCAP.get(t, float("inf"))]
+        if not cell_panel:
+            continue
+        RC.run_cell(cell, cell_panel, args.reps)
     print("CONV DONE", flush=True)
 
 

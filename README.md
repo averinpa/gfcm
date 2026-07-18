@@ -165,8 +165,14 @@ run() { docker run --rm -v "$PWD/out/data":/work/data -v "$PWD/out/results":/wor
 PANEL=gfcm,ffci,blitz,rcot,gcm_boosted,par_cop
 
 # core benchmark
-run python experiments/run_cells.py        --panel $PANEL      # §5.2-5.5 tables
-run python experiments/run_convergence.py  --panel $PANEL      # §5.6 convergence
+run python experiments/run_cells.py                            # §5.2-5.5 tables (each cell uses its
+                                                               #   own manifest panel — do NOT pass
+                                                               #   --panel here; that forces par_cop
+                                                               #   onto the n=1e5 cells, where it
+                                                               #   stalls for hours)
+run python experiments/run_convergence.py  --panel $PANEL      # §5.6 convergence (gcm_boosted capped
+                                                               #   at n=20000, par_cop at n=10000
+                                                               #   inside run_convergence.py)
 run python experiments/run_pc.py           --panel $PANEL      # §5.8/5.10 PC discovery
 # appendix + real-data + speed
 run python experiments/run_ablation.py                         # asym / interaction / tradeoff / rankz
@@ -185,6 +191,17 @@ compute, not minutes. Every `(cell, test)` is written the moment it finishes and
 restart (atomic `.claim` files), so you can stop/resume freely and launch **many workers in
 parallel** on the same output dir — they coordinate via the claim files. Start small
 (`--reps 20 --tier 0`) to sanity-check, then scale up.
+
+**One-command driver.** `bash run_all.sh` runs the smoke check then the full pipeline above,
+serially and deterministically on any machine. On a many-core box, set `JOBS` to fan the
+`run_cells` phase across that many worker containers (each is thread-capped to one core, so pick
+`JOBS` ≈ physical cores); they coordinate via the `.claim` files and the output is bit-identical
+regardless of `JOBS`:
+
+```bash
+bash run_all.sh              # canonical serial reproduction
+JOBS=48 bash run_all.sh      # same result, run_cells fanned across 48 workers
+```
 
 **No image is published.** Anyone you grant repo access to (a reviewer, a collaborator, you on a
 server) builds it locally with the command above. Publishing a pre-built image to a registry is
