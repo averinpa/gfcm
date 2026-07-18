@@ -77,9 +77,12 @@ fan run_cells python experiments/run_cells.py
 echo "[$(date)] === FULL: convergence (5.6)  JOBS=$JOBS ==="
 fan convergence python experiments/run_convergence.py --panel "$PANEL"
 
-# The remaining phases run serially: they are not claim-coordinated, and speed must be uncontended.
-echo "[$(date)] === FULL: pc discovery (5.8/5.10) [serial] ==="
-run python experiments/run_pc.py           --panel "$PANEL"
+# pc discovery: claim-safe (per (cell,rep) atomic .claim in run_pc.py), so it fans too.
+echo "[$(date)] === FULL: pc discovery (5.8/5.10)  JOBS=$JOBS ==="
+fan pc python experiments/run_pc.py --panel "$PANEL"
+
+# The remaining phases run SERIALLY: ablation/injection/cc_injection have no claim coordination
+# (parallel copies would duplicate work, not split it), and speed's timings must be uncontended.
 echo "[$(date)] === FULL: ablation (appendix) [serial] ==="
 run python experiments/run_ablation.py
 echo "[$(date)] === FULL: injection (tab:inject, EuStock) [serial] ==="
