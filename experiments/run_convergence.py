@@ -28,7 +28,7 @@ import run_cells as RC
 INTEREST = [
     ("5.3_power", dgp.power_ladder,    ["tail_shape", "null"]),                 # centerpiece washout
     ("5.4_tail",  dgp.tail_edge_sweep, ["alpha_3", "null"]),                    # tail-edge washout
-    ("5.2_calib", dgp.calib_nulls,     ["heavy_tail", "hetero", "mixed_Z"]),    # calibration onset
+    ("5.2_calib", dgp.calib_nulls,     ["heavy_tail", "hetero", "mixed_Z", "nonlin_mean"]),  # calibration onset (nonlin_mean = the non-additive null tab:conv-null needs)
 ]
 DEFAULT_NGRID = [500, 1000, 1500, 2000, 2500, 3000, 4000, 5000,
                  7000, 10000, 15000, 20000, 50000, 100000]

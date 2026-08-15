@@ -26,23 +26,28 @@ import adapters
 OUT = os.path.join(_ROOT, "results", "aggregated")
 
 
-def _timeit(obj, x, y, S):
-    """Per-query wall time in ms: warm up, then adaptively repeat so cheap calls average out."""
-    def one():
-        return float(obj(x, y, S))
-    one()                                            # warm (JIT, JVM, first-fit caches)
-    t0 = time.perf_counter(); one(); el = time.perf_counter() - t0
+def _timeit(mk, x, y, S):
+    """Per-query wall time in ms, UNCACHED: rebuild the (cheap, lazy) test object each rep so any
+    result cache never hits -- inside PC each new query is a cache miss, so the uncached compute is
+    the cost that matters -- then report the median over adaptive reps."""
+    obj = mk(); t0 = time.perf_counter(); float(obj(x, y, S)); el = time.perf_counter() - t0
     reps = 1 if el > 5 else (3 if el > 0.5 else 8)
-    if reps > 1:
-        t0 = time.perf_counter()
-        for _ in range(reps):
-            one()
-        el = (time.perf_counter() - t0) / reps
-    return el * 1000.0
+    times = [el]
+    for _ in range(reps - 1):
+        obj = mk(); t0 = time.perf_counter(); float(obj(x, y, S)); times.append(time.perf_counter() - t0)
+    times.sort()
+    return times[len(times) // 2] * 1000.0
 
 
 def run(panel, ns, ds):
     rows = []
+    # global warm-up: trigger JIT / JVM / R-init once per test so the grid times compute only
+    warm = np.random.RandomState(0).randn(600, 5)
+    for nm in panel:
+        try:
+            adapters.make_test(nm, warm)(0, 1, [2, 3])
+        except Exception:
+            pass
     for n in ns:
         for d in ds:
             rng = np.random.RandomState(n * 100 + d)
@@ -50,7 +55,7 @@ def run(panel, ns, ds):
             data = np.column_stack([X, Y, Z]); S = list(range(2, 2 + d))
             for nm in panel:
                 try:
-                    ms = _timeit(adapters.make_test(nm, data), 0, 1, S)
+                    ms = _timeit(lambda nm=nm, data=data: adapters.make_test(nm, data), 0, 1, S)
                 except NotImplementedError:
                     raise
                 except Exception:

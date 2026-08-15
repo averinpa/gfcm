@@ -43,54 +43,72 @@ def eu_innov():
     return z.reshape(-1)                            # pool -> 1-D innovation bank
 
 
-def make(rng, pool, n, dz, gamma, inject):
-    """Semi-synthetic (X, Y, Z): real innovations + optional mean/cov-preserving tail edge X->Y."""
+def make(rng, pool, n, dz, c, inject):
+    """Semi-synthetic (X, Y, Z): real innovations + optional SKEW-NORMAL tail edge X->Y.
+
+    X drives the conditional SKEW of Y via a skew-normal shape, with conditional mean AND variance
+    held flat EXACTLY per row (Var(es)=1 for any marginal, because es mixes two independent
+    standardized draws with coefficients sqrt(1-delta^2) and delta). So mean/covariance/scale tests
+    are blind by construction and only a skew/tail-sensitive test recovers the edge -- this is the
+    construction behind tab:inject. (The earlier Fleishman variant es=(eY+d(eY^2-1)/sqrt2)/sqrt(1+d^2)
+    only preserves variance for Gaussian eY; on heavy-tailed innovations its eY^2 term leaks a
+    detectable scale edge, so it does NOT match the paper.)"""
+    a_mean = np.mean(np.abs(pool)); a_std = np.std(np.abs(pool))
     Z = rng.choice(pool, size=(n, dz), replace=True)
     w = rng.normal(size=dz) / np.sqrt(dz); v = rng.normal(size=dz) / np.sqrt(dz)
-    eX = rng.choice(pool, size=n); eY = rng.choice(pool, size=n)
-    X = Z @ w + eX
+    eX = rng.choice(pool, size=n); X = Z @ w + eX
     Xc = eX                                          # Z-orthogonal part of X
-    # Fleishman-style skew injection: X drives Y's skewness, mean AND variance preserved.
-    d = (gamma * np.tanh(Xc)) if inject else np.zeros(n)
-    es = (eY + d * (eY ** 2 - 1) / np.sqrt(2)) / np.sqrt(1 + d ** 2)
+    b = rng.choice(pool, size=n); u = rng.choice(pool, size=n)
+    au = (np.abs(u) - a_mean) / a_std                # |u| centered/scaled to mean 0, var 1
+    alpha = (c * Xc) if inject else np.zeros(n)
+    delta = alpha / np.sqrt(1.0 + alpha ** 2)
+    es = np.sqrt(1.0 - delta ** 2) * b + delta * au  # mean 0, var 1 exactly, skew ~ delta(Xc)
     Y = Z @ v + es
     return np.column_stack([X, Y, Z])                # cols: 0=X, 1=Y, 2..=Z
 
 
-def run(panel, n=2000, dz=3, gamma=1.5, R=120, alpha=ALPHA, seed=0):
+def run(panel, n=2000, dz=3, c=4.0, R=200, alpha=ALPHA, seed=0):
+    """Emit one row per (test, cell, rep, pval). Retaining the raw p-values (not just reject
+    counts) lets the table size-correct each test to exact 5% on its matched null -- the metric
+    tab:inject reports -- rather than raw alpha=0.05 power."""
     pool = eu_innov()
     rng = np.random.default_rng(seed)
-    acc = {nm: {"null": 0, "alt": 0} for nm in panel}
+    rows = []
     S = list(range(2, 2 + dz))
-    for _ in range(R):
+    for r in range(R):
         for inject in (False, True):
-            data = make(rng, pool, n, dz, gamma, inject)
+            data = make(rng, pool, n, dz, c, inject)
             for nm in panel:
                 try:
                     p = float(adapters.make_test(nm, data)(0, 1, S))
-                    acc[nm]["alt" if inject else "null"] += int(p < alpha)
                 except NotImplementedError:
                     raise
                 except Exception:
-                    pass
-    return pd.DataFrame([dict(method=nm, level=acc[nm]["null"] / R, power=acc[nm]["alt"] / R)
-                         for nm in panel])
+                    p = float("nan")
+                rows.append(dict(test=nm, cell=("alt" if inject else "null"), rep=r, pval=p))
+    return pd.DataFrame(rows)
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--panel", default="gfcm", help="comma-separated test names")
-    ap.add_argument("--reps", type=int, default=120)
+    ap.add_argument("--reps", type=int, default=200)
     ap.add_argument("--n", type=int, default=2000)
-    ap.add_argument("--gamma", type=float, default=1.5)
+    ap.add_argument("--c", type=float, default=4.0, help="skew-normal edge strength")
     args = ap.parse_args()
     panel = args.panel.split(",")
-    print(f"tab:inject -- EuStock tail-edge injection (n={args.n}, gamma={args.gamma}, reps={args.reps})")
-    df = run(panel, n=args.n, gamma=args.gamma, R=args.reps)
+    print(f"tab:inject -- EuStock skew-normal tail-edge injection (n={args.n}, c={args.c}, reps={args.reps})")
+    df = run(panel, n=args.n, c=args.c, R=args.reps)
     os.makedirs(OUT, exist_ok=True)
     p = os.path.join(OUT, "injection_eustock.parquet")
     df.to_parquet(p, index=False)
-    print(df.to_string(index=False))
+    # quick console summary: raw size + size-corrected power per test
+    for nm in panel:
+        nu = df[(df.test == nm) & (df.cell == "null")].pval.dropna().values
+        al = df[(df.test == nm) & (df.cell == "alt")].pval.dropna().values
+        if len(nu) and len(al):
+            crit = np.percentile(nu, 100 * ALPHA)
+            print(f"  {nm:12s} size={ (nu<ALPHA).mean():.3f}  sc-power={ (al<crit).mean():.3f}")
     print(f"wrote {p}")
 
 
