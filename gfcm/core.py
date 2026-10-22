@@ -19,7 +19,7 @@ configuration; construct a modified `GFCMConfig(...)` for ablations.
 """
 import logging
 import warnings
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import numpy as np
 from scipy.linalg import cho_factor, cho_solve
@@ -67,6 +67,10 @@ class GFCMConfig:
     rawz_lin: bool = True              # add a raw standardized linear-Z block (heavy-tail fix)
     proj_k: int = 8                    # spline knots on each estimated index direction
     proj_nmin: int = 5000              # n-gate: single-index block active at n >= proj_nmin, |S| >= 2
+    # Optional; the defaults below reproduce the published configuration exactly.
+    comove: bool = False                      # add the co-movement block
+    comove_parts: tuple = ("scale", "tail")   # "scale" = cX.cY, "tail" = matched corners rX.rY
+    across: str = "cauchy"                    # "cauchy" | "bonferroni" | "cauchy_joint"
 
 
 def _log_config(cfg):
@@ -76,9 +80,9 @@ def _log_config(cfg):
         _LOGGED_CONFIGS.add(key)
         _LOG.info(
             "active config: scale=%s calib=%s gcv=%s proj=%s rankz=%s inter=%s "
-            "nuisance=%s taus=%s combine=%s",
+            "nuisance=%s taus=%s combine=%s comove=%s across=%s",
             cfg.scale, cfg.calib, cfg.gcv, cfg.proj, cfg.rankz, cfg.inter,
-            cfg.nuisance, cfg.taus, cfg.combine,
+            cfg.nuisance, cfg.taus, cfg.combine, cfg.comove, cfg.across,
         )
 
 
@@ -269,6 +273,66 @@ def _mvgcm_p(M, signs, cfg, ridge=1e-6, center=False):
     Tb = signs @ M
     Sb = np.einsum("bi,ij,bj->b", Tb, Si, Tb)
     return (1 + int((Sb >= S0).sum())) / (len(signs) + 1)
+
+
+def _mvgcm_stat(M, signs, ridge=1e-6):
+    """Wald statistic and its sign-flipped reference for one block, sharing one Rademacher draw."""
+    n, k = M.shape
+    G = M.T @ M
+    Si = np.linalg.pinv(G + ridge * np.trace(G) / k * np.eye(k))
+    T = M.sum(0)
+    Tb = signs @ M
+    return float(T @ Si @ T), np.einsum("bi,ij,bj->b", Tb, Si, Tb), k
+
+
+def _cauchy_joint(Ms, signs):
+    """ACAT across blocks, calibrated by a joint sign-flip that keeps the cross-block dependence."""
+    t0, tb = 0.0, np.zeros(len(signs))
+    for M in Ms:
+        S0, Sb, k = _mvgcm_stat(M, signs)
+        p0 = np.clip(chi2.sf(S0, df=k), 1e-15, 1 - 1e-15)
+        pb = np.clip(chi2.sf(Sb, df=k), 1e-15, 1 - 1e-15)
+        t0 += np.tan((0.5 - p0) * np.pi)
+        tb += np.tan((0.5 - pb) * np.pi)
+    return (1 + int((tb >= t0).sum())) / (len(signs) + 1)
+
+
+def _comove_block(cX, cY, RX, RY, taus, parts=("scale", "tail")):
+    """Products of two higher-order features, cX.cY and the matched tail corners rX.rY."""
+    lo, hi = int(np.argmin(taus)), int(np.argmax(taus))
+    cols = []
+    if "scale" in parts:
+        cols.append(cX * cY)
+    if "tail" in parts:
+        cols.append(RX[:, lo] * RY[:, lo])
+        if hi != lo:
+            cols.append(RX[:, hi] * RY[:, hi])
+    if not cols:
+        raise ValueError(f"comove_parts must contain 'scale' and/or 'tail', got {parts!r}")
+    return np.column_stack(cols)
+
+
+def _combine_blocks(Ms, signs, cfg):
+    """Block p-values -> one p-value under cfg.across."""
+    if cfg.across == "cauchy_joint":
+        return _cauchy_joint(Ms, signs)
+    ps = [_mvgcm_p(M, signs, cfg) for M in Ms]
+    if cfg.across == "cauchy":
+        return _cauchy(ps)
+    if cfg.across == "bonferroni":
+        return float(min(1.0, len(ps) * min(ps)))
+    raise ValueError(f"unknown across rule: {cfg.across!r} (expected 'cauchy', 'bonferroni', 'cauchy_joint')")
+
+
+def _detail(Ms, signs, cfg):
+    """Every combination rule, with and without the co-movement block, from one set of features."""
+    ps = [_mvgcm_p(M, signs, cfg) for M in Ms]
+    out = {f"p_block{i}": float(p) for i, p in enumerate(ps)}
+    for tag, m in (("3", 3), ("4", len(Ms))):
+        out[f"acat{tag}"] = _cauchy(ps[:m])
+        out[f"bonf{tag}"] = float(min(1.0, m * min(ps[:m])))
+        out[f"joint{tag}"] = _cauchy_joint(Ms[:m], signs)
+    return out
 
 
 def _fold_solvers(Zt, folds, alpha):
@@ -473,7 +537,7 @@ def _mixed_combine(Xf, Yf, x_cat, y_cat, signs, cfg):
 
 
 def unified_test(X, Y, Z, taus=None, K=None, B=None, seed=0, config=None,
-                 x_cat=None, y_cat=None, z_cat=None):
+                 x_cat=None, y_cat=None, z_cat=None, detail=False):
     """GFCM conditional-independence p-value for H0: X independent of Y given Z.
 
     config: a GFCMConfig; defaults to the canonical published configuration.
@@ -482,6 +546,8 @@ def unified_test(X, Y, Z, taus=None, K=None, B=None, seed=0, config=None,
     per-column boolean array. Left as None, each is auto-detected via `_is_cat` (integer-coded
     with few distinct levels -> categorical, else continuous). A categorical X or Y switches to
     the one-hot residual bank; categorical Z-columns enter the design as one-hot dummies.
+    detail: return a dict of block p-values and every combination rule (continuous X, Y, p3 only)
+    instead of the single p-value; the config's own p-value is under key "p".
     """
     cfg = config if config is not None else GFCMConfig()
     _log_config(cfg)
@@ -505,7 +571,10 @@ def unified_test(X, Y, Z, taus=None, K=None, B=None, seed=0, config=None,
     else:
         z_cat = np.asarray(z_cat, bool).reshape(-1)
     _report_types(X, Y, Z, x_cat, y_cat, z_cat, auto)
+    tf = 1.0 - 1.0 / cfg.folds
     if bool(x_cat) or bool(y_cat):            # mixed-type: one-hot residual bank (Section sec:mixed)
+        if detail or cfg.comove or cfg.across != "cauchy":
+            raise NotImplementedError("comove / across / detail are implemented for continuous X, Y only")
         nn = len(X)
         signs = np.random.default_rng(seed).choice([-1.0, 1.0], size=(B, nn))
         if Z.shape[1] == 0:
@@ -562,16 +631,31 @@ def unified_test(X, Y, Z, taus=None, K=None, B=None, seed=0, config=None,
 
     RY = np.column_stack([rxY[t] for t in taus])
     RX = np.column_stack([rxX[t] for t in taus])
-    if cfg.combine == "p3":               # DEFAULT: [cov + both scales] | [eX.rY] | [rX.eY]
-        # pool the coherent moment evidence in one block; keep the two quantile ORIENTATIONS apart
-        ps = [_mvgcm_p(np.column_stack([eX * eY, cX * eY, eX * cY]), signs, cfg),
-              _mvgcm_p(eX[:, None] * RY, signs, cfg),
-              _mvgcm_p(RX * eY[:, None], signs, cfg)]
-        return _cauchy(ps)
-    if cfg.combine == "p2":               # [cov + both scales] | [both quantile orientations pooled]
-        ps = [_mvgcm_p(np.column_stack([eX * eY, cX * eY, eX * cY]), signs, cfg),
-              _mvgcm_p(np.column_stack([eX[:, None] * RY, RX * eY[:, None]]), signs, cfg)]
-        return _cauchy(ps)
+    if cfg.combine in ("p3", "p2"):
+        if cfg.combine == "p3":           # DEFAULT: [cov + both scales] | [eX.rY] | [rX.eY]
+            # pool the coherent moment evidence in one block; keep the two quantile ORIENTATIONS apart
+            Ms = [np.column_stack([eX * eY, cX * eY, eX * cY]),
+                  eX[:, None] * RY,
+                  RX * eY[:, None]]
+        else:                             # [cov + both scales] | [both quantile orientations pooled]
+            Ms = [np.column_stack([eX * eY, cX * eY, eX * cY]),
+                  np.column_stack([eX[:, None] * RY, RX * eY[:, None]])]
+        if detail:
+            if cfg.combine != "p3" or cfg.comove:
+                raise NotImplementedError("detail is defined for combine='p3' without comove")
+            out = _detail(Ms + [_comove_block(cX, cY, RX, RY, taus)], signs, cfg)
+            out["p"] = _combine_blocks(Ms, signs, cfg)
+            ps3 = [out[f"p_block{i}"] for i in range(3)]
+            for tag, part in (("ss", ("scale",)), ("tt", ("tail",))):   # each co-movement part alone
+                pb = _mvgcm_p(_comove_block(cX, cY, RX, RY, taus, part), signs, cfg)
+                out[f"p_{tag}"] = float(pb)
+                out[f"acat4_{tag}"] = _cauchy(ps3 + [pb])
+            return out
+        if cfg.comove:
+            Ms.append(_comove_block(cX, cY, RX, RY, taus, cfg.comove_parts))
+        return _combine_blocks(Ms, signs, cfg)
+    if detail or cfg.comove or cfg.across != "cauchy":
+        raise NotImplementedError("comove / across / detail need combine='p3' or 'p2'")
     if cfg.combine == "cauchy":           # 5-way ACAT: every product a separate block (no pooling)
         ps = [_signflip_p(eX * eY, signs),                  # covariance
               _signflip_p(cX * eY, signs),                  # X-scale x Y-level

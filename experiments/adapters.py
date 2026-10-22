@@ -37,7 +37,8 @@ def config_id(name, config=None):
     if name == "gfcm":
         c = config or CANONICAL
         return (f"gfcm:scale={c.scale},calib={c.calib},gcv={c.gcv},proj={c.proj},"
-                f"rankz={c.rankz},inter={c.inter},combine={c.combine}")
+                f"rankz={c.rankz},inter={c.inter},combine={c.combine},"
+                f"comove={c.comove},across={c.across}")
     if name == "ffci":
         return "ffci:tetrad_default"
     return f"{name}:default"

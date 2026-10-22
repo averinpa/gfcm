@@ -1,0 +1,33 @@
+\begin{table}[t]\centering\small
+\caption{Power beyond $|S|=5$: size-corrected power on the alternative ladder of Section~\ref{sec:ablation} at $|S|=10$ and $20$ ($500$ replications, Wilson 95\% CI), with each test re-thresholded to exact $5\%$ on its own null at the same $(|S|,n)$; the italic rows give the raw size on that null with its Wilson interval, bold where the interval lies above $0.05$. This null belongs to the power family, whose conditioners drive both $X$ and $Y$; it is not one of the calibration nulls of Tables~\ref{tab:envelope} and \ref{tab:envelopeb}. Size correction removes the inflation but not its cost: where a test's null $p$-values are degenerate, the corrected threshold leaves it no power.}
+\label{tab:deeppower}
+\begin{tabular}{llrcccc}
+\toprule
+alternative & $|S|$ & $n$ & \textbf{GFCM} & BLITZ & RCoT & FFCI \\
+\midrule
+\emph{null size} & 10 & 2000 & \textbf{0.27~[0.23--0.31]} & 0.06~[0.04--0.08] & \textbf{0.08~[0.06--0.11]} & 0.06~[0.04--0.08] \\
+linear mean & 10 & 2000 & 1.00~[0.99--1.00] & 1.00~[0.99--1.00] & 1.00~[0.99--1.00] & 1.00~[0.99--1.00] \\
+non-monotone mean & 10 & 2000 & 1.00~[0.99--1.00] & 1.00~[0.99--1.00] & 0.96~[0.93--0.97] & 1.00~[0.99--1.00] \\
+scale & 10 & 2000 & 1.00~[0.99--1.00] & 1.00~[0.99--1.00] & 0.84~[0.80--0.87] & 0.96~[0.93--0.97] \\
+tail shape & 10 & 2000 & 0.23~[0.20--0.27] & 0.22~[0.18--0.25] & 0.04~[0.02--0.06] & 0.04~[0.02--0.06] \\
+\midrule
+\emph{null size} & 10 & $10^4$ & \textbf{0.08~[0.06--0.11]} & 0.05~[0.03--0.07] & 0.06~[0.05--0.09] & 0.05~[0.03--0.07] \\
+linear mean & 10 & $10^4$ & 1.00~[0.99--1.00] & 1.00~[0.99--1.00] & 1.00~[0.99--1.00] & 1.00~[0.99--1.00] \\
+non-monotone mean & 10 & $10^4$ & 1.00~[0.99--1.00] & 1.00~[0.99--1.00] & 1.00~[0.99--1.00] & 1.00~[0.99--1.00] \\
+scale & 10 & $10^4$ & 1.00~[0.99--1.00] & 1.00~[0.99--1.00] & 1.00~[0.99--1.00] & 1.00~[0.99--1.00] \\
+tail shape & 10 & $10^4$ & 1.00~[0.99--1.00] & 0.85~[0.81--0.88] & 0.07~[0.05--0.10] & 0.10~[0.08--0.13] \\
+\midrule
+\emph{null size} & 20 & 2000 & \textbf{0.96~[0.94--0.98]} & 0.06~[0.04--0.08] & 0.05~[0.03--0.07] & 0.04~[0.02--0.06] \\
+linear mean & 20 & 2000 & 1.00~[0.99--1.00] & 1.00~[0.99--1.00] & 1.00~[0.99--1.00] & 1.00~[0.99--1.00] \\
+non-monotone mean & 20 & 2000 & 0.56~[0.52--0.61] & 1.00~[0.99--1.00] & 0.93~[0.91--0.95] & 1.00~[0.99--1.00] \\
+scale & 20 & 2000 & 0.05~[0.04--0.08] & 1.00~[0.99--1.00] & 0.45~[0.41--0.49] & 0.41~[0.37--0.46] \\
+tail shape & 20 & 2000 & 0.06~[0.04--0.09] & 0.24~[0.20--0.28] & 0.07~[0.05--0.10] & 0.06~[0.04--0.09] \\
+\midrule
+\emph{null size} & 20 & $10^4$ & \textbf{0.21~[0.17--0.25]} & 0.06~[0.04--0.08] & 0.05~[0.03--0.07] & 0.05~[0.04--0.08] \\
+linear mean & 20 & $10^4$ & 1.00~[0.99--1.00] & 1.00~[0.99--1.00] & 1.00~[0.99--1.00] & 1.00~[0.99--1.00] \\
+non-monotone mean & 20 & $10^4$ & 1.00~[0.99--1.00] & 1.00~[0.99--1.00] & 1.00~[0.99--1.00] & 1.00~[0.99--1.00] \\
+scale & 20 & $10^4$ & 1.00~[0.99--1.00] & 1.00~[0.99--1.00] & 0.94~[0.92--0.96] & 1.00~[0.99--1.00] \\
+tail shape & 20 & $10^4$ & 0.99~[0.98--1.00] & 0.82~[0.79--0.85] & 0.06~[0.04--0.08] & 0.05~[0.03--0.07] \\
+\bottomrule
+\end{tabular}
+\end{table}

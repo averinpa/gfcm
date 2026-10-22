@@ -1,0 +1,29 @@
+\begin{table}[t]\centering\small
+\caption{Power across the alternative ladder, $n=2000$ (size-corrected power: each test's threshold set to exact $5\%$ size on the matched null; Wilson 95\% CI). \rev{The italic rows give the raw size of each test on that null at $\alpha=0.05$, bold where the interval lies above $0.05$, so the correction each test needed is visible. GFCM's null rejection rate on this family reaches $0.13$ and $0.15$ at $|S|=3$ and $5$, against $0.05$ to $0.09$ for the others, because the family's $X$ has conditional mean $\sin(\sum_j Z_j)$, a ridge function that no additive nuisance can represent, so assumption (A1) fails for it; on the four calibration nulls of Table~\ref{tab:calib-n2k}, which satisfy (A1), GFCM is at $0.04$ to $0.10$ at the same depths.} Bold marks GFCM on the skew alternative, where it alone keeps power as $|S|$ grows.}
+\label{tab:power-n2k}
+\setlength{\tabcolsep}{4pt}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llcccccc}
+\toprule
+mechanism & $|S|$ & \textbf{GFCM} & PartCopula & BLITZ & FFCI & RCoT & GCM-boost \\
+\midrule
+\emph{null size} & 1 & 0.052~[0.036--0.075] & 0.038~[0.024--0.059] & 0.052~[0.036--0.075] & 0.038~[0.024--0.059] & 0.040~[0.026--0.061] & 0.050~[0.034--0.073] \\
+linear\_mean & 1 & 1.00~[0.99--1.00] & 0.99~[0.97--0.99] & 1.00~[0.99--1.00] & 1.00~[0.99--1.00] & 1.00~[0.99--1.00] & 1.00~[0.99--1.00] \\
+nonmonotone\_z2 & 1 & 1.00~[0.99--1.00] & 1.00~[0.99--1.00] & 1.00~[0.99--1.00] & 1.00~[0.99--1.00] & 0.99~[0.98--1.00] & 0.06~[0.04--0.08] \\
+scale & 1 & 1.00~[0.99--1.00] & 0.99~[0.98--1.00] & 1.00~[0.99--1.00] & 1.00~[0.99--1.00] & 0.99~[0.98--1.00] & 0.06~[0.05--0.09] \\
+tail\_shape & 1 & \textbf{0.99~[0.97--0.99]} & 0.06~[0.04--0.08] & 0.16~[0.13--0.19] & 0.92~[0.89--0.94] & 0.41~[0.37--0.46] & 0.08~[0.06--0.11] \\
+\midrule
+\emph{null size} & 3 & \textbf{0.130~[0.103--0.162]} & \textbf{0.090~[0.068--0.118]} & 0.052~[0.036--0.075] & \textbf{0.076~[0.056--0.103]} & 0.058~[0.041--0.082] & \textbf{0.098~[0.075--0.127]} \\
+linear\_mean & 3 & 1.00~[0.99--1.00] & 0.99~[0.98--1.00] & 1.00~[0.99--1.00] & 1.00~[0.99--1.00] & 1.00~[0.99--1.00] & 1.00~[0.99--1.00] \\
+nonmonotone\_z2 & 3 & 1.00~[0.99--1.00] & 1.00~[0.99--1.00] & 1.00~[0.99--1.00] & 1.00~[0.99--1.00] & 1.00~[0.99--1.00] & 0.06~[0.04--0.08] \\
+scale & 3 & 1.00~[0.99--1.00] & 0.99~[0.97--0.99] & 1.00~[0.99--1.00] & 1.00~[0.99--1.00] & 0.97~[0.95--0.98] & 0.05~[0.03--0.07] \\
+tail\_shape & 3 & \textbf{0.90~[0.87--0.92]} & 0.05~[0.03--0.07] & 0.12~[0.10--0.15] & 0.21~[0.18--0.25] & 0.11~[0.08--0.14] & 0.06~[0.04--0.08] \\
+\midrule
+\emph{null size} & 5 & \textbf{0.150~[0.121--0.184]} & 0.060~[0.042--0.084] & 0.054~[0.037--0.077] & 0.048~[0.032--0.070] & \textbf{0.094~[0.071--0.123]} & \textbf{0.096~[0.073--0.125]} \\
+linear\_mean & 5 & 1.00~[0.99--1.00] & 0.99~[0.98--1.00] & 1.00~[0.99--1.00] & 1.00~[0.99--1.00] & 1.00~[0.99--1.00] & 1.00~[0.99--1.00] \\
+nonmonotone\_z2 & 5 & 1.00~[0.99--1.00] & 1.00~[0.99--1.00] & 1.00~[0.99--1.00] & 1.00~[0.99--1.00] & 0.99~[0.98--1.00] & 0.03~[0.02--0.05] \\
+scale & 5 & 1.00~[0.99--1.00] & 0.97~[0.95--0.98] & 1.00~[0.99--1.00] & 1.00~[0.99--1.00] & 0.94~[0.91--0.95] & 0.04~[0.02--0.06] \\
+tail\_shape & 5 & \textbf{0.86~[0.82--0.88]} & 0.07~[0.05--0.10] & 0.21~[0.17--0.24] & 0.15~[0.12--0.18] & 0.06~[0.05--0.09] & 0.03~[0.02--0.05] \\
+\bottomrule
+\end{tabular}}
+\end{table}

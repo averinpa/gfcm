@@ -51,17 +51,23 @@ def _grid_cat(df):
     return df
 
 
+def _mean_sem(df, gcols, metrics):
+    """Per group: mean and sem (std/sqrt(n), NaN-skipping) for each metric, interleaved, + n_reps."""
+    g = df.groupby(gcols, observed=True)
+    out = g[metrics].mean().round(3)
+    sem = g[metrics].sem().round(3)                 # pandas sem = std(ddof=1)/sqrt(n), skipna
+    sem.columns = [c + "_sem" for c in sem.columns]
+    out = out.join(sem)
+    out["n_reps"] = g.size()
+    cols = [c for m in metrics for c in (m, m + "_sem")]
+    return out[cols + ["n_reps"]].reset_index()
+
+
 def summarize_grid_pc(df):
-    """item 3a: quantile grid vs PC discovery. Mean of the score columns per (grid, n)."""
+    """item 3a: quantile grid vs PC discovery. Mean +/- sem per (grid, n)."""
     df = _grid_cat(df)
     recall_cols = sorted(c for c in df.columns if c.startswith("recall_"))
-    metrics = ["shd", "precision", "recall"] + recall_cols
-    agg = (df.groupby(["grid", "n"], observed=True)[metrics]
-             .agg(lambda s: np.nanmean(s.values)).round(3))
-    agg["n_reps"] = df.groupby(["grid", "n"], observed=True).size()
-    agg["shd_sem"] = (df.groupby(["grid", "n"], observed=True)["shd"]
-                        .agg(lambda s: s.std(ddof=1) / np.sqrt(len(s)) if len(s) > 1 else 0.0)).round(3)
-    return agg.reset_index()
+    return _mean_sem(df, ["grid", "n"], ["shd", "precision", "recall"] + recall_cols)
 
 
 def summarize_grid_null(df):
@@ -79,16 +85,13 @@ def summarize_grid_null(df):
 
 
 def summarize_p20(df):
-    """items 4+5: p=20 discovery + FP + timing. Mean per (test, n)."""
-    df = df[~df.get("error", pd.Series(index=df.index, dtype=object)).notna()] if "error" in df else df
+    """items 4+5: p=20 discovery + FP + timing. Mean +/- sem per (test, n, edge_prob)."""
+    if "error" in df.columns:
+        df = df[df["error"].isna()]
+    gcols = ["test", "n"] + (["edge_prob"] if "edge_prob" in df.columns else [])
     recall_cols = sorted(c for c in df.columns if c.startswith("recall_"))
-    metrics = ["shd", "precision", "recall", "fp_edges", "wall_s"] + recall_cols
-    metrics = [m for m in metrics if m in df.columns]
-    agg = (df.groupby(["test", "n"])[metrics].agg(lambda s: np.nanmean(s.values)).round(3))
-    agg["n_reps"] = df.groupby(["test", "n"]).size()
-    agg["shd_sem"] = (df.groupby(["test", "n"])["shd"]
-                        .agg(lambda s: s.std(ddof=1) / np.sqrt(len(s)) if len(s) > 1 else 0.0)).round(3)
-    return agg.reset_index()
+    metrics = [m for m in ["shd", "precision", "recall", "fp_edges", "n_queries", "wall_s"] if m in df.columns] + recall_cols
+    return _mean_sem(df, gcols, metrics)
 
 
 def _completeness(df, kind, nfiles):
@@ -106,7 +109,10 @@ def _completeness(df, kind, nfiles):
     else:  # p20
         have = sorted(set(df["test"]))
         missing = [t for t in EXPECTED_P20_PANEL if t not in have]
-        rc = df.groupby(["test", "n"]).size()
+        gcols = ["test", "n"] + (["edge_prob"] if "edge_prob" in df.columns else [])
+        rc = df.groupby(gcols).size()
+        if "edge_prob" in df.columns:
+            lines.append(f"  edge_prob(s) present = {sorted(set(df['edge_prob']))}")
         lines.append(f"  panel present = {have}")
         if missing:
             lines.append(f"  !! panel INCOMPLETE, missing: {missing} (staged run in progress?)"); partial = True

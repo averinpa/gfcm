@@ -1,0 +1,26 @@
+\begin{table}[t]\centering\small
+\begin{tabular}{lrrcc}
+\toprule
+null & $|S|$ & $n$ & Cauchy (default) & Bonferroni \\
+\midrule
+location-scale, Gaussian noise & 1 & 2000 & 0.064~[0.046--0.089] & 0.044~[0.029--0.066] \\
+location-scale, Gaussian noise & 1 & $10^4$ & 0.058~[0.041--0.082] & 0.038~[0.024--0.059] \\
+location-scale, Gaussian noise & 3 & 2000 & 0.056~[0.039--0.080] & 0.036~[0.023--0.056] \\
+location-scale, Gaussian noise & 3 & $10^4$ & 0.048~[0.032--0.070] & 0.038~[0.024--0.059] \\
+location-scale, skewed noise & 1 & 2000 & 0.044~[0.029--0.066] & 0.034~[0.021--0.054] \\
+location-scale, skewed noise & 1 & $10^4$ & 0.046~[0.031--0.068] & 0.026~[0.015--0.044] \\
+location-scale, skewed noise & 3 & 2000 & 0.042~[0.028--0.063] & 0.042~[0.028--0.063] \\
+location-scale, skewed noise & 3 & $10^4$ & 0.050~[0.034--0.073] & 0.032~[0.020--0.051] \\
+skewness varies with $Z_1$ & 1 & 2000 & 0.046~[0.031--0.068] & 0.032~[0.020--0.051] \\
+skewness varies with $Z_1$ & 1 & $10^4$ & 0.048~[0.032--0.070] & 0.036~[0.023--0.056] \\
+skewness varies with $Z_1$ & 3 & 2000 & 0.076~[0.056--0.103] & 0.060~[0.042--0.084] \\
+skewness varies with $Z_1$ & 3 & $10^4$ & 0.066~[0.047--0.091] & 0.044~[0.029--0.066] \\
+skewness varies with $Z_1$, strong & 1 & 2000 & 0.044~[0.029--0.066] & 0.030~[0.018--0.049] \\
+skewness varies with $Z_1$, strong & 1 & $10^4$ & 0.068~[0.049--0.094] & 0.048~[0.032--0.070] \\
+skewness varies with $Z_1$, strong & 3 & 2000 & 0.082~[0.061--0.109] & 0.070~[0.051--0.096] \\
+skewness varies with $Z_1$, strong & 3 & $10^4$ & 0.070~[0.051--0.096] & 0.042~[0.028--0.063] \\
+\bottomrule
+\end{tabular}
+\caption{Level when assumption (A5) fails. $X\indep Y\given Z$ holds in every cell; $Y=\sum_j Z_j+\eta$ with $\eta$ Gaussian, skew-normal of fixed shape (both location-scale), or skew-normal whose shape is $3Z_1$ or $8Z_1$ (not location-scale). Size at $\alpha=0.05$, 500 replications, Wilson 95\% CI.}
+\label{tab:misspec}
+\end{table}

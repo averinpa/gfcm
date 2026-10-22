@@ -93,9 +93,9 @@ def _typed_dag(p, edge_prob, seed, n):
     return df.to_numpy(float), list(df.columns), true_sk, etype
 
 
-def _pc_scores(nm, data, nodes, true_sk, etype, ci):
-    """Run PC with a prebuilt CI test, return the skeleton score row (SHD/precision/recall/fp + types)."""
-    cg = _disc.run_pc(data, nodes, ci, ALPHA, MAX_COND)
+def _pc_scores(nm, data, nodes, true_sk, etype, ci, log=None):
+    """Run PC with a prebuilt CI test and return the skeleton score row; log collects CI queries."""
+    cg = _disc.run_pc(data, nodes, ci, ALPHA, MAX_COND, log=log)
     learned = _disc.cpdag_skeleton(cg, nodes)
     sc = _metrics.skeleton_scores(true_sk, learned, nodes)
     sc.update({f"recall_{t}": v for t, v in _metrics.per_type_recall(etype, learned).items()})
@@ -133,28 +133,30 @@ def rep_grid_null(gridlabel, taus, n, it):
     print(f"grid_null {gridlabel} n{n} rep {it}: p={p:.3f}", flush=True)
 
 
-def rep_p20(n, it, panel_tests):
-    key = f"rebuttal_p20__n{n}"
+def rep_p20(n, it, panel_tests, edge_prob):
+    key = f"rebuttal_p20__ep{edge_prob:g}__n{n}"
     outp = os.path.join(OUT, f"{key}__rep{it:04d}.parquet")
     if not _claim(outp):
         return
-    data, nodes, true_sk, etype = _typed_dag(P20_P, P20_EDGE_PROB, SEED0 + it, n)
+    data, nodes, true_sk, etype = _typed_dag(P20_P, edge_prob, SEED0 + it, n)
     rows = []
     for nm in panel_tests:
         t0 = time.perf_counter()
         try:
             ci = adapters.make_test(nm, data)
-            sc = _pc_scores(nm, data, nodes, true_sk, etype, ci)
-            sc.update(dict(test=nm, n=n, rep=it, p=P20_P, edge_prob=P20_EDGE_PROB,
-                           wall_s=time.perf_counter() - t0, config_id=adapters.config_id(nm)))
+            log = []
+            sc = _pc_scores(nm, data, nodes, true_sk, etype, ci, log=log)
+            sc.update(dict(test=nm, n=n, rep=it, p=P20_P, edge_prob=edge_prob,
+                           n_queries=len(log), wall_s=time.perf_counter() - t0,
+                           config_id=adapters.config_id(nm)))
             rows.append(sc)
         except NotImplementedError:
             raise
         except Exception as e:
-            rows.append(dict(test=nm, n=n, rep=it, p=P20_P, error=str(e)[:200],
+            rows.append(dict(test=nm, n=n, rep=it, p=P20_P, edge_prob=edge_prob, error=str(e)[:200],
                              wall_s=time.perf_counter() - t0))
     pd.DataFrame(rows).to_parquet(outp, index=False)
-    print(f"p20 n{n} rep {it}: {len(rows)} tests", flush=True)
+    print(f"p20 ep{edge_prob:g} n{n} rep {it}: {len(rows)} tests", flush=True)
 
 
 def main():
@@ -163,6 +165,8 @@ def main():
     ap.add_argument("--n", type=int, help="restrict to one sample size")
     ap.add_argument("--reps", type=int, help="override rep count (smoke)")
     ap.add_argument("--only", help="p20 only: comma-separated subset of the panel (e.g. gfcm)")
+    ap.add_argument("--edge-prob", type=float, default=P20_EDGE_PROB,
+                    help="p20 edge probability: 0.105 = expected degree ~2, 0.21 = ~4")
     args = ap.parse_args()
     os.makedirs(OUT, exist_ok=True)
     ns = (args.n,) if args.n else NS
@@ -187,7 +191,7 @@ def main():
             panel = [t for t in panel if t in keep]
         for n in ns:
             for it in range(reps):
-                rep_p20(n, it, panel)
+                rep_p20(n, it, panel, args.edge_prob)
     print(f"REBUTTAL {args.mode} DONE -> {OUT}", flush=True)
 
 

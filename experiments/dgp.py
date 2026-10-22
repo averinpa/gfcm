@@ -965,6 +965,48 @@ def power_ladder(n: int = N_SCALE, seed: int = 1, dS: int = 3) -> dict:
     }
 
 
+# Power ladder with an additive X mean, so assumption (A1) holds; Y and the alternatives are
+# unchanged from power_ladder.
+# --------------------------------------------------------------------------
+
+def power_ladder_additive(n: int = N_SCALE, seed: int = 1, dS: int = 3) -> dict:
+    Z, src = _znodes(dS, "gauss")
+    W = [f"W{i}" for i in range(1, dS + 1)]
+    wnodes = {w: {"type": "continuous",
+                  "functional_form": {"name": "sin", "weights": {z: 1.5}},
+                  "noise_model": {"name": "additive", "dist": "gaussian", "std": 0.01}}
+              for w, z in zip(W, Z)}
+    xnode = {"type": "continuous",
+             "functional_form": {"name": "linear", "weights": {w: 1.0 / np.sqrt(dS) for w in W}},
+             "noise_model": {"name": "additive", "dist": "gaussian", "std": 0.7}}
+    base_w = {z: 0.7 for z in Z}; base_d = {z: 2 for z in Z}
+
+    def poly_y(extra_w, extra_d, noise):
+        return {"type": "continuous",
+                "functional_form": {"name": "polynomial",
+                                    "weights": {**base_w, **extra_w},
+                                    "degrees": {**base_d, **extra_d}},
+                "noise_model": noise}
+
+    fork = [(z, w) for z, w in zip(Z, W)] + [(w, "X") for w in W] + [(z, "Y") for z in Z]
+    tri = fork + [("X", "Y")]
+
+    def cfg(edges, y):
+        return {"simulation_params": _sp(n, seed, dS),
+                "graph_params": {"type": "custom", "nodes": Z + W + ["X", "Y"], "edges": edges},
+                "node_params": {**src, **wnodes, "X": xnode, "Y": y}}
+    gauss = {"name": "additive", "dist": "gaussian", "std": 1.0}
+    return {
+        "null":           cfg(fork, poly_y({}, {}, gauss)),
+        "linear_mean":    cfg(tri,  poly_y({"X": 0.6}, {"X": 1}, gauss)),
+        "nonmonotone_z2": cfg(tri,  poly_y({"X": 0.5}, {"X": 2}, gauss)),
+        "scale":          cfg(tri,  poly_y({"X": 0.0}, {"X": 1},
+                                           {"name": "heteroskedastic", "func": _scale_X})),
+        "tail_shape":     cfg(tri,  poly_y({"X": 0.0}, {"X": 1},
+                                           {"name": "shape", "func": _skew_X, "std": 1.0})),
+    }
+
+
 # §5.4  The conditional-tail edge (centerpiece) ----------------------------
 
 def tail_edge_sweep(n: int = N_SCALE, seed: int = 1, dS: int = 1,
@@ -1070,3 +1112,130 @@ def plan_smoke(n: int = 400):
             ok += 1
             print(f"  ok  {sec:18s} {label}")
     print(f"\n{ok} PLAN configs built + oracle-checked OK")
+
+
+# --------------------------------------------------------------------------
+# Even-scale edge: a scale even in X's residual, invisible to every default pair and seen
+# only by the co-movement block.
+# --------------------------------------------------------------------------
+
+def _e_x(parent_data):
+    """X's residual given Z. X = sum_j Z_j + noise (weights 1), so E[X|Z] = sum Z exactly."""
+    zc = [c for c in parent_data.columns if c.startswith("Z")]
+    e = parent_data["X"].to_numpy()
+    if zc:
+        e = e - parent_data[zc].to_numpy().sum(axis=1)
+    return e
+
+
+def _even_scale(parent_data):
+    """Reviewer's scale 1 + e_X^2: even in e_X."""
+    return 1.0 + _e_x(parent_data) ** 2
+
+
+def _mono_scale(parent_data):
+    """Monotone control 0.3 + exp(0.5 e_X): odd component, detectable by the default set."""
+    return 0.3 + np.exp(0.5 * np.clip(_e_x(parent_data), -4.0, 4.0))
+
+
+def evenscale_cells(n: int = 2000, seed: int = 1, dS: int = 0) -> dict:
+    """Pure-scale edges X -> Y with the conditional mean of Y held fixed, query X _||_ Y | Z1..ZdS.
+    dS = 0 is the reviewer's exact case: X ~ Unif[-1, 1] (additive uniform noise on a zero-weight
+    gaussian source W, which is never conditioned on), Y = (1 + X^2) eps.
+    dS > 0: Z gaussian, X = sum Z + N(0,1), Y = sum Z + scale(e_X) eps.
+    Cells: null (no X -> Y edge), even (1 + e_X^2), mono (0.3 + exp(0.5 e_X))."""
+    def het(fn):
+        return {"name": "heteroskedastic", "func": fn}
+    if dS == 0:
+        nodes = ["W", "X", "Y"]
+        src = {"W": gaussian_source(),
+               "X": {"type": "continuous", "functional_form": {"name": "linear", "weights": {"W": 0.0}},
+                     "noise_model": {"name": "additive", "dist": "uniform", "scale": 1.0}}}
+        yflat = lambda nm: {"type": "continuous",
+                            "functional_form": {"name": "linear", "weights": {"X": 0.0}},
+                            "noise_model": nm}
+
+        def cfg(edge, y):
+            return {"simulation_params": _sp(n, seed, 1),
+                    "graph_params": {"type": "custom", "nodes": nodes,
+                                     "edges": [("W", "X")] + ([("X", "Y")] if edge else [])},
+                    "node_params": {**src, "Y": y}}
+        return {"null": cfg(False, gaussian_source()),
+                "even": cfg(True, yflat(het(_even_scale))),
+                "mono": cfg(True, yflat(het(_mono_scale)))}
+    Z, src = _znodes(dS, "gauss")
+    fork = _fork(Z); tri = fork + [("X", "Y")]
+    xnode = _mean_over_Z(Z)                                  # X = sum Z + N(0,1)
+    ymean = {"name": "linear", "weights": {**{z: 1.0 for z in Z}, "X": 0.0}}
+
+    def cfg(edges, y):
+        return {"simulation_params": _sp(n, seed, dS),
+                "graph_params": {"type": "custom", "nodes": Z + ["X", "Y"], "edges": edges},
+                "node_params": {**src, "X": xnode, "Y": y}}
+    return {"null": cfg(fork, _mean_over_Z(Z)),
+            "even": cfg(tri, {"type": "continuous", "functional_form": ymean, "noise_model": het(_even_scale)}),
+            "mono": cfg(tri, {"type": "continuous", "functional_form": ymean, "noise_model": het(_mono_scale)})}
+
+
+# --------------------------------------------------------------------------
+# Interaction null at depth: a shared Z1*Z2 mean the design may not represent, which leaves
+# a bias in the GCM product that does not vanish.
+# --------------------------------------------------------------------------
+
+def interaction_at_depth(n: int = 2000, seed: int = 1, dS: int = 5) -> dict:
+    """A fixed Z1*Z2 mean shared by X and Y while Z3..ZdS only grow the conditioning set."""
+    Z, src = _znodes(dS, "gauss")
+    edges = [("Z1", "X"), ("Z2", "X"), ("Z1", "Y"), ("Z2", "Y")]
+
+    def child(with_inter):
+        ff = ({"name": "interaction", "weights": {"interaction": 1.0}} if with_inter
+              else {"name": "linear", "weights": {"Z1": 1.0, "Z2": 1.0}})
+        return {"type": "continuous", "functional_form": ff,
+                "noise_model": {"name": "additive", "dist": "gaussian", "std": 0.5}}
+
+    def cfg(with_inter):
+        return {"simulation_params": _sp(n, seed, dS),
+                "graph_params": {"type": "custom", "nodes": Z + ["X", "Y"], "edges": edges},
+                "node_params": {**src, "X": child(with_inter), "Y": child(with_inter)}}
+    return {"additive": cfg(False), "interaction": cfg(True)}
+
+
+# --------------------------------------------------------------------------
+# Location-scale misspecification nulls: X _||_ Y | Z holds but Y's skewness varies with Z1,
+# so assumption (A5) of Theorem 1 fails; two location-scale controls accompany them.
+# --------------------------------------------------------------------------
+
+def _skew_fixed4(parent_data):
+    return np.full(len(parent_data), 4.0)
+
+
+def _skew_z1_3(parent_data):
+    return 3.0 * np.clip(parent_data["Z1"].to_numpy(), -2.0, 2.0)
+
+
+def _skew_z1_8(parent_data):
+    return 8.0 * np.clip(parent_data["Z1"].to_numpy(), -2.0, 2.0)
+
+
+def misspec_nulls(n: int = 2000, seed: int = 1, dS: int = 1) -> dict:
+    """Four nulls with X = sum Z + N(0,1) and Y = sum Z + noise, query X _||_ Y | Z1..ZdS (true):
+      ls_gauss        Gaussian noise (location-scale, the paper's usual null)
+      ls_skew_fixed   skew-normal noise with shape 4 at every Z (skewed but location-scale)
+      notls_skew_z    skew-normal noise with shape 3*Z1 (shape varies with Z: NOT location-scale)
+      notls_skew_z8   shape 8*Z1 (stronger)"""
+    Z, src = _znodes(dS, "gauss")
+    xnode = _mean_over_Z(Z)
+
+    def y(noise):
+        return {"type": "continuous",
+                "functional_form": {"name": "linear", "weights": {z: 1.0 for z in Z}},
+                "noise_model": noise}
+
+    def cfg(noise):
+        return {"simulation_params": _sp(n, seed, dS),
+                "graph_params": {"type": "custom", "nodes": Z + ["X", "Y"], "edges": _fork(Z)},
+                "node_params": {**src, "X": xnode, "Y": y(noise)}}
+    return {"ls_gauss":      cfg({"name": "additive", "dist": "gaussian", "std": 1.0}),
+            "ls_skew_fixed": cfg({"name": "shape", "func": _skew_fixed4, "std": 1.0}),
+            "notls_skew_z":  cfg({"name": "shape", "func": _skew_z1_3, "std": 1.0}),
+            "notls_skew_z8": cfg({"name": "shape", "func": _skew_z1_8, "std": 1.0})}

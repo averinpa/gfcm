@@ -1,0 +1,29 @@
+# Paper 2 fig:speed provenance
+timestamp_utc: 2026-07-28T07:32:00Z
+cpuset: none (full machine)
+threads: OMP/OPENBLAS/MKL/NUMEXPR/NUMBA/R = 64 (all thread caps released)
+panel: gfcm,blitz,rcot,ffci
+ns: 2000,5000,10000,100000
+ds: 2,5,20
+run_speed.py: PATCHED (uncached per-query timing + global warm-up)
+
+Threading note: FULL MACHINE. This reflects real deployment -- nobody runs PC on
+a single pinned core. Every test in the panel gets the same core budget, so the
+comparison is fair. The prior single-thread run is retained as
+speed_grid_singlethread.parquet (conservative worst case that penalizes GFCM's
+BLAS-parallel design most; the paper figure uses these full-machine numbers).
+
+## uname
+Linux phd-bench-02 6.8.0-100-generic #100-Ubuntu SMP PREEMPT_DYNAMIC Tue Jan 13 16:40:06 UTC 2026 x86_64 x86_64 x86_64 GNU/Linux
+
+## lscpu
+Model name:                              AMD EPYC 7502 32-Core Processor
+BIOS Model name:                         AMD EPYC 7502 32-Core Processor                 Unknown CPU @ 2.5GHz
+Thread(s) per core:                      2
+Core(s) per socket:                      32
+Socket(s):                               1
+CPU max MHz:                             2500.0000
+CPU min MHz:                             1500.0000
+
+## image digest
+sha256:926eb5f2b7ac61ae4847b80c2e20b0f596343e900d08d443aa7633bc4ec07f36
