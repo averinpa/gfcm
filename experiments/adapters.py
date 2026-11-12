@@ -17,7 +17,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(
 
 CANONICAL = GFCMConfig()                                     # the test, correction on and lazily evaluated
 EXACT = GFCMConfig(varcorr_decide=None)                      # the same test, exact corrected p on every call
-_GFCM = {"gfcm": CANONICAL, "gfcm_exact": EXACT,
+NOCORR = GFCMConfig(varcorr=False)                           # the same test with the correction off
+_GFCM = {"gfcm": CANONICAL, "gfcm_exact": EXACT, "gfcm_nocorr": NOCORR,
          "gfcm_vc": EXACT, "gfcm_lazy": CANONICAL}          # (gfcm_vc / gfcm_lazy: older names, kept for the 23-24 Oct runs)
 # The "as submitted" arm is the submitted CODE, not a flag on the current one: the current test
 # differs from it in the categorical design as well as the variance correction, so no configuration

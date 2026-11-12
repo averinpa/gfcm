@@ -48,28 +48,26 @@ p = unified_test(X, Y, Z)                       # canonical config by default ->
 
 Configuration is **explicit**, via the frozen `GFCMConfig` dataclass — there are no environment
 variables. The dataclass **defaults are the canonical published configuration**, so calling
-`unified_test(X, Y, Z)` with no `config` reproduces the paper's test. Ablations construct a
-modified config; the active configuration is logged once (via the `gfcm` logger).
+`unified_test(X, Y, Z)` with no `config` reproduces the paper's test. Variants construct a
+modified config.
 
 ```python
-unified_test(X, Y, Z, config=GFCMConfig(scale="e2"))   # e.g. the squared-scale ablation
+unified_test(X, Y, Z, config=GFCMConfig(rankz=False))   # e.g. without the rank transform
 ```
 
 Key fields (defaults shown are canonical):
 
 | field | default | meaning |
 |-------|---------|---------|
-| `scale`   | `"abs"`  | scale feature `\|e\|` (robust); **not** the non-robust `"e2"` |
-| `calib`   | `"chi2"` | block calibration (analytic chi-squared) |
 | `gcv`     | `2`      | GCV ridge selection on the scale fit |
 | `proj`    | `True`   | single-index (SIR) block, n-gated to `\|S\|>=2, n>=5000` |
 | `rankz`   | `True`   | rank-transform the conditioners before the spline |
 | `inter`   | `True`   | degree-3 polynomial interaction block |
-| `nuisance`| `"spline"`| nuisance backend (`"spline"` or `"poly"`) |
 | `taus`    | `(0.1, 0.5, 0.9)` | quantile levels |
+| `varcorr_decide` | `0.05` | evaluate the variance correction lazily at this level; `None` = exact on every call |
 
-(Structural parameters — `combine`, `b`, `folds`, `ties`, `inter_maxd`, `rawz_lin`, `proj_k`,
-`proj_nmin` — are also fields; see `GFCMConfig` in `gfcm/core.py`.)
+(Also fields: `folds`, `proj_nmin`, `across`, `comove`, `comove_parts`; see `GFCMConfig` in
+`gfcm/core.py`.)
 
 ## Mixed-type data
 
@@ -122,7 +120,7 @@ python experiments/run_cells.py --panel gfcm,rcot,gcm_boosted,fisherz,ci_mm   # 
 
 python experiments/run_convergence.py --only gfcm     # §5.6 convergence sweep
 python experiments/run_pc.py          --only gfcm     # §5.8/§5.10 PC discovery (+ decision logs)
-python experiments/run_ablation.py                    # appendix: asym / interaction / tradeoff / rankz
+python experiments/run_components.py                    # appendix: asym / interaction / tradeoff / rankz
 python experiments/run_injection.py   --panel gfcm    # tab:inject (EuStock real-data injection)
 python experiments/run_cc_injection.py                # tab:cc-inject (Causal-Chamber light tunnel)
 python experiments/run_speed.py       --panel gfcm    # fig:speed timing grid
@@ -175,7 +173,7 @@ run python experiments/run_convergence.py  --panel $PANEL      # §5.6 convergen
                                                                #   inside run_convergence.py)
 run python experiments/run_pc.py           --panel $PANEL      # §5.8/5.10 PC discovery
 # appendix + real-data + speed
-run python experiments/run_ablation.py                         # asym / interaction / tradeoff / rankz
+run python experiments/run_components.py                         # asym / interaction / tradeoff / rankz
 run python experiments/run_injection.py    --panel $PANEL      # tab:inject (EuStock)
 run python experiments/run_cc_injection.py --panel gfcm,rcot,gcm_boosted,fisherz   # tab:cc-inject
 run python experiments/run_speed.py        --panel $PANEL      # fig:speed grid

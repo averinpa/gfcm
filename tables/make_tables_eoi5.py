@@ -20,6 +20,7 @@ caption kept in the paper), mirroring make_tables.py.
   python tables/make_tables_eoi5.py
 """
 import glob
+import sys
 import os
 
 import numpy as np
@@ -27,7 +28,16 @@ import pandas as pd
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _ROOT = os.path.dirname(_HERE)
-DATA = os.path.join(_ROOT, "data_reviewers", "eoi5")
+def _data_dir():
+    """Where run_eoi5.py writes, then the archived copy the submitted tables were built from."""
+    base = os.environ.get("REBUTTAL_OUT") or os.path.join(_ROOT, "data", "rebuttal")
+    for d in (os.path.join(base, "eoi5"), os.path.join(_ROOT, "data_reviewers", "eoi5")):
+        if glob.glob(os.path.join(d, "eoi5_*.parquet")):
+            return d
+    return os.path.join(base, "eoi5")
+
+
+DATA = _data_dir()
 OUT = os.path.join(_ROOT, "results", "tables")
 os.makedirs(OUT, exist_ok=True)
 ALPHA = 0.05
@@ -54,7 +64,10 @@ def _fmt(k, m, dec=3):
 
 
 def _load():
-    d = pd.concat(pd.read_parquet(f) for f in glob.glob(os.path.join(DATA, "eoi5_ci__*.parquet")))
+    fs = glob.glob(os.path.join(DATA, "eoi5_ci__*.parquet"))
+    if not fs:
+        sys.exit(f"no eoi5_ci__*.parquet in {DATA} (run experiments/run_eoi5.py --mode ci)")
+    d = pd.concat(pd.read_parquet(f) for f in fs)
     return d[d.test == "gfcm"].copy()
 
 

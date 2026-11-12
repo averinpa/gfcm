@@ -1,4 +1,4 @@
-"""The deciding ablation for the co-movement block: is the extra block free on level and on power, and what does
+"""The deciding comparison for the co-movement block: is the extra block free on level and on power, and what does
 it buy where it is supposed to help?
 
 Three arms on the SAME draw (paired, so a difference is never a difference in data):
@@ -93,7 +93,7 @@ def main():
     if a.out: OUT = a.out
     os.makedirs(OUT, exist_ok=True)
     ns = [int(x) for x in a.ns.split(",")]; ds = [int(x) for x in a.ds.split(",")]
-    print(f"co-movement ablation, family {a.family}: arms {list(ARMS)} x n {ns} x |S| {ds} x {a.reps} reps -> {OUT}", flush=True)
+    print(f"co-movement, family {a.family}: arms {list(ARMS)} x n {ns} x |S| {ds} x {a.reps} reps -> {OUT}", flush=True)
     for n in ns:
         for dS in ds:
             for cell in _cells(a.family, 50, 1, dS).keys():

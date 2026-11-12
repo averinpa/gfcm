@@ -49,3 +49,13 @@ def per_type_recall(etype, learned_edges):
         by[t].append(e)
     return {t: (float(np.mean([1.0 if e in learned else 0.0 for e in es])) if es else float("nan"))
             for t, es in by.items()}
+
+
+def cpdag_scores(true_cg, cg):
+    """Arrowhead agreement with the true CPDAG, plus CPDAG SHD."""
+    ta, la = set(true_cg.directed_edges()), set(cg.directed_edges())
+    tp = len(ta & la)
+    return dict(cpdag_shd=int(bnmetrics.shd(true_cg, cg)),
+                arrow_precision=tp / len(la) if la else float("nan"),
+                arrow_recall=tp / len(ta) if ta else float("nan"),
+                n_arrows_true=len(ta), n_arrows_learned=len(la), n_arrows_correct=tp)

@@ -9,6 +9,7 @@ protocol needs on top of a bare callable -- `details()` returning a CITestResult
 from __future__ import annotations
 
 import cbcd                                       # pinned dependency (see requirements.txt)
+import networkx as nx
 import numpy as np
 from cbcd.citest import CITestResult
 
@@ -54,3 +55,29 @@ def cpdag_skeleton(cg, nodes):
         i, j = tuple(fs)
         out.add(frozenset((nodes[i], nodes[j])))
     return out
+
+
+class DSepOracle:
+    """d-separation oracle on the true DAG, in cbcd's CITest shape (p = 1 separated, 0 connected)."""
+
+    def __init__(self, G, p, log=None):
+        self.G, self.n_vars, self._log = G, p, log
+        self._dsep = nx.is_d_separator if hasattr(nx, "is_d_separator") else nx.d_separated
+
+    def __call__(self, x, y, S):
+        S = [int(s) for s in S]
+        if self._log is not None:
+            self._log.append(len(S))
+        return 1.0 if self._dsep(self.G, {int(x)}, {int(y)}, set(S)) else 0.0
+
+    def details(self, x, y, S):
+        return cbcd.CITestResult(p_value=self(x, y, S))
+
+
+def true_cpdag(edges_named, nodes, alpha=0.05):
+    """The CPDAG of the true DAG: PC driven by the oracle, so the Markov equivalence class is exact."""
+    idx = {v: i for i, v in enumerate(nodes)}
+    G = nx.DiGraph(); G.add_nodes_from(range(len(nodes)))
+    G.add_edges_from((idx[a], idx[b]) for a, b in edges_named)
+    return cbcd.pc(np.zeros((4, len(nodes))), ci_test=DSepOracle(G, len(nodes)), alpha=alpha,
+                   var_names=list(nodes))

@@ -503,7 +503,7 @@ def _alt_means(K: int, delta: float) -> dict:
     return {f"X={j}": m[j] - c for j in range(K)}
 
 
-def mixed_native(n: int = 2000, seed: int = 1, K: int = 3, dS: int = 1, delta: float = 0.0,
+def cat_level_means(n: int = 2000, seed: int = 1, K: int = 3, dS: int = 1, delta: float = 0.0,
                  cat_in_Z: bool = False) -> dict:
     """One cell: continuous Z1..ZdS, categorical X (K levels, logistic in Z), continuous Y.
     delta = 0 is the matched null (no X->Y edge); delta > 0 puts the alternating level means on Y.

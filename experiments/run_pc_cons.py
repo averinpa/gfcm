@@ -31,7 +31,8 @@ import adapters
 import dgp
 import discovery as _disc
 import metrics as _metrics
-from run_eoi5 import _cpdag_scores, _true_cpdag
+from discovery import true_cpdag as _true_cpdag
+from metrics import cpdag_scores as _cpdag_scores
 
 OUT = os.environ.get("PCC_OUT") or os.path.join(os.path.dirname(_HERE), "data", "pc_cons")
 SEED0 = 20000                      # same stream as run_eoi5's PC cells, so the graphs match the paper

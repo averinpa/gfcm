@@ -41,7 +41,9 @@ REPS = 500
 PANEL = ("gfcm", "blitz", "rcot", "ffci", "gcm_boosted", "par_cop")
 # "gfcm_published" is the submitted configuration (variance correction off) on the SAME seeds, so the effect of the
 # correction is read cell by cell from paired runs rather than from the published tables.
-PANEL_EXTRA = ("gfcm_published",)
+# gfcm_nocorr is the arm F7 compares against. gfcm_published (the submitted code) is not in any
+# current table or figure; add it back with --only if a paired "as submitted" column is wanted.
+PANEL_EXTRA = ("gfcm_nocorr",)
 FAMILY = {"null": "calib", "power": "ladderadd"}
 
 
@@ -66,8 +68,9 @@ def _cells(table, n, seed, dS):
     return dgp.calib_nulls(n, seed, dS) if table == "null" else dgp.power_ladder_additive(n, seed, dS)
 
 
-def rep(table, cell, dS, n, it, panel):
-    key = f"grid_{table}__{cell}__dS{dS}__n{n}" + ("__pub" if panel == ["gfcm_published"] else "")
+def rep(table, cell, dS, n, it, panel, taus=None):
+    key = (f"grid_{table}__{cell}__dS{dS}__n{n}" + ("__pub" if panel == ["gfcm_published"] else "")
+           + ("__taus" + "_".join(f"{t:g}" for t in taus) if taus else ""))
     outp = os.path.join(OUT, f"{key}__rep{it:04d}.parquet")
     if not _claim(outp):
         return
@@ -76,14 +79,19 @@ def rep(table, cell, dS, n, it, panel):
     df = CausalDataGenerator(cfg).simulate()["data"]
     cols = list(df.columns); data = df.to_numpy(float)
     xi, yi = cols.index("X"), cols.index("Y"); Si = [cols.index(f"Z{i}") for i in range(1, dS + 1)]
-    base = dict(table=table, cell=cell, dS=dS, n=n, rep=it, seed=SEED0 + it)
+    base = dict(table=table, cell=cell, dS=dS, n=n, rep=it, seed=SEED0 + it,
+                taus=",".join(f"{t:g}" for t in taus) if taus else "")
     rows = []
     for nm in panel:
         if not runs_here(nm, n, dS):
             rows.append({**base, "test": nm, "pval": float("nan"), "status": "not run", "wall_s": float("nan")}); continue
         t0 = time.perf_counter()
         try:
-            p = float(adapters.make_test(nm, data)(xi, yi, Si))
+            cfgt = None
+            if taus and nm.startswith("gfcm"):      # the quantile grid is a GFCM setting; competitors are unaffected
+                from gfcm import GFCMConfig
+                cfgt = GFCMConfig(taus=tuple(taus), varcorr_decide=None if nm == "gfcm_exact" else 0.05)
+            p = float(adapters.make_test(nm, data, config=cfgt)(xi, yi, Si))
             st = "ok" if not np.isnan(p) else ("outside domain" if nm == "gfcm" else "nan")   # only GFCM refuses by design
             rows.append({**base, "test": nm, "pval": p, "status": st, "wall_s": time.perf_counter() - t0})
         except NotImplementedError:
@@ -102,6 +110,7 @@ def main():
     ap.add_argument("--reps", type=int, default=REPS)
     ap.add_argument("--only", help="comma-separated subset of the panel")
     ap.add_argument("--cells", help="comma-separated subset of the cells (e.g. mixed_Z)")
+    ap.add_argument("--taus", help="GFCM quantile grid, e.g. 0.1,0.9 (default: the configured 0.1,0.5,0.9)")
     ap.add_argument("--out", help="output directory (default GRID_OUT or data/grid)")
     args = ap.parse_args()
     global OUT
@@ -109,14 +118,16 @@ def main():
     os.makedirs(OUT, exist_ok=True)
     panel = [t for t in PANEL + PANEL_EXTRA if (not args.only or t in args.only.split(","))]
     ns = [int(x) for x in args.ns.split(",")]; ds = [int(x) for x in args.ds.split(",")]
-    print(f"grid {args.table}: panel {panel} x n {ns} x |S| {ds} x {args.reps} reps -> {OUT}", flush=True)
+    taus = [float(x) for x in args.taus.split(",")] if args.taus else None
+    print(f"grid {args.table}: panel {panel} x n {ns} x |S| {ds} x {args.reps} reps"
+          + (f", taus {taus}" if taus else "") + f" -> {OUT}", flush=True)
     for n in ns:
         for dS in ds:
             keep = set(args.cells.split(",")) if args.cells else None
             for cell in _cells(args.table, 50, 1, dS).keys():
                 if keep and cell not in keep: continue
                 for it in range(args.reps):
-                    rep(args.table, cell, dS, n, it, panel)
+                    rep(args.table, cell, dS, n, it, panel, taus)
     print(f"GRID {args.table} DONE", flush=True)
 
 

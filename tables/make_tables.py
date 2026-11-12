@@ -283,7 +283,7 @@ _ASYM_ROWS = [("null", "null"), ("scale", "scale"),
 def asym():
     p = os.path.join(RESULTS, "asym.parquet")
     if not os.path.exists(p):
-        print("asym: no results/aggregated/asym.parquet (run paper2_kit/exp_asym.py)"); return None
+        print("asym: no results/aggregated/asym.parquet (run experiments/run_components.py asym)"); return None
     df = pd.read_parquet(p).set_index("dgp")
     lines = [r"\begin{table}[ht]\centering", r"\begin{tabular}{lcc}", r"\toprule",
              r"alternative ($X\!\to\!Y$) & asymmetric $e_X r_\tau(Y)$ & "
@@ -321,7 +321,7 @@ def nuisance_tradeoff():
     p = os.path.join(RESULTS, "nuisance_tradeoff.parquet")
     if not os.path.exists(p):
         print("nuisance_tradeoff: no results/aggregated/nuisance_tradeoff.parquet "
-              "(run paper2_kit/exp_nuisance_tradeoff.py)"); return None
+              "(run experiments/run_components.py tradeoff)"); return None
     df = pd.read_parquet(p).set_index(["kind", "n"])
 
     def cell(v, lo, hi, bold=False):
@@ -358,7 +358,7 @@ def interaction():
     p = os.path.join(RESULTS, "interaction.parquet")
     if not os.path.exists(p):
         print("interaction: no results/aggregated/interaction.parquet "
-              "(run paper2_kit/exp_interaction.py)"); return None
+              "(run experiments/run_components.py interaction)"); return None
     df = pd.read_parquet(p)
     ns = sorted(df.n.unique())
     ncol = {1000: r"$n=10^3$", 4000: r"$n=4{\cdot}10^3$", 16000: r"$n=1.6{\cdot}10^4$"}
@@ -393,7 +393,7 @@ def interaction():
 def rankz():
     p = os.path.join(RESULTS, "rankz.parquet")
     if not os.path.exists(p):
-        print("rankz: no results/aggregated/rankz.parquet (run paper2_kit/stress_rankz.py)")
+        print("rankz: no results/aggregated/rankz.parquet (run experiments/run_components.py rankz)")
         return None
     df = pd.read_parquet(p)
 

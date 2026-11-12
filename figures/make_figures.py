@@ -274,7 +274,7 @@ def tail_depth():
 
 
 # --------------------------------------------------------------------------- detection class
-def _quantile_block_p(X, Y, Z, taus, cfg, seed=0, B=199):
+def _quantile_block_p(X, Y, Z, taus, cfg, seed=0):
     """Single-orientation quantile-block p-value beta(tau)=E[e_X r_tau(Y)] for a tau grid --
     the sub-bank the detection-class figure isolates (no covariance/scale blocks)."""
     X = np.asarray(X, float); Y = np.asarray(Y, float); Z = np.asarray(Z, float)
@@ -287,9 +287,8 @@ def _quantile_block_p(X, Y, Z, taus, cfg, seed=0, B=199):
     eY = _resid_with(solvers, Zt, Y, None)
     cY = _resid_with(solvers, Zt, np.abs(eY), None)
     s2Y = (np.abs(eY) - cY) ** 2                      # |e|-scale -> variance proxy for standardization
-    RY = np.column_stack([_ls_quant_resid(eY, s2Y, folds, taus, cfg)[t] for t in taus])
-    signs = np.random.default_rng(seed).choice([-1.0, 1.0], size=(B, len(X)))
-    return _mvgcm_p(eX[:, None] * RY, signs, cfg)
+    RY = np.column_stack([_ls_quant_resid(eY, s2Y, folds, taus)[t] for t in taus])
+    return _mvgcm_p(eX[:, None] * RY)
 
 
 def _scale_alt(seed, n):

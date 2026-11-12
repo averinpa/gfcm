@@ -3,6 +3,7 @@ data/*
 !data/.gitkeep
 results/raw/
 results/figures/
+results/aggregated/tables/
 *.parquet
 *.pdf
 

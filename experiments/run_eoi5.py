@@ -24,9 +24,14 @@ import adapters
 import dgp
 import discovery as _disc
 import metrics as _metrics
+from discovery import DSepOracle as _Oracle, true_cpdag as _true_cpdag
+from metrics import cpdag_scores as _cpdag_scores
 from gfcm import GFCMConfig, infer_types, unified_test
 
-OUT = os.environ.get("REBUTTAL_OUT") or os.path.join(os.path.dirname(_HERE), "data", "rebuttal")
+# one place for the eoi5 cells: aggregate_eoi5.py and tables/make_tables_eoi5.py both read it.
+# REBUTTAL_OUT still moves the whole tree (the server runs set it); run_rebuttal.py keeps the parent.
+OUT = os.path.join(os.environ.get("REBUTTAL_OUT")
+                   or os.path.join(os.path.dirname(_HERE), "data", "rebuttal"), "eoi5")
 SEED0_CI = 30000     # disjoint from run_pc (10000) and run_rebuttal (20000)
 SEED0_ENV = 40000    # the operating-envelope grid
 SEED0_PC = 20000     # SAME as run_rebuttal p20, so the p = 20 skeleton numbers reproduce
@@ -165,38 +170,10 @@ def rep_ci(family, cell, dS, n, it, full):
 
 # ---------------------------------------------------------------- PC with CPDAG scoring
 
-class _Oracle:
-    """d-separation oracle on the true DAG, in cbcd's CITest shape (p = 1 separated, 0 connected)."""
-
-    def __init__(self, G, p, log=None):
-        self.G, self.n_vars, self._log = G, p, log
-        self._dsep = nx.is_d_separator if hasattr(nx, "is_d_separator") else nx.d_separated
-
-    def __call__(self, x, y, S):
-        S = [int(s) for s in S]
-        if self._log is not None:
-            self._log.append(len(S))
-        return 1.0 if self._dsep(self.G, {int(x)}, {int(y)}, set(S)) else 0.0
-
-    def details(self, x, y, S):
-        return cbcd.CITestResult(p_value=self(x, y, S))
 
 
-def _true_cpdag(edges_named, nodes):
-    idx = {v: i for i, v in enumerate(nodes)}
-    G = nx.DiGraph(); G.add_nodes_from(range(len(nodes)))
-    G.add_edges_from((idx[a], idx[b]) for a, b in edges_named)
-    return cbcd.pc(np.zeros((4, len(nodes))), ci_test=_Oracle(G, len(nodes)), alpha=ALPHA,
-                   var_names=list(nodes))
 
 
-def _cpdag_scores(true_cg, cg):
-    ta, la = set(true_cg.directed_edges()), set(cg.directed_edges())
-    tp = len(ta & la)
-    return dict(cpdag_shd=int(bnmetrics.shd(true_cg, cg)),
-                arrow_precision=tp / len(la) if la else float("nan"),
-                arrow_recall=tp / len(ta) if ta else float("nan"),
-                n_arrows_true=len(ta), n_arrows_learned=len(la), n_arrows_correct=tp)
 
 
 def rep_oracle(p, deg, it, cap, ep=None):

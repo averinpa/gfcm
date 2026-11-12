@@ -56,6 +56,9 @@ class GFCMConfig:
     # --- finite-sample variance correction (gfcm/varcorr.py); continuous X and Y only ---
     # Lazily evaluated: the exact corrected p whenever it is at or below the band, the guarded
     # uncorrected p (a lower bound) above it. varcorr_decide=None computes the exact p on every call.
+    # varcorr=False is the same test with R in place of R + Delta, the arm the correction is measured
+    # against; it is NOT the submitted test, which also differs in the categorical design.
+    varcorr: bool = True
     varcorr_decide: float = 0.05              # lazy evaluation at this level (None = exact p always)
 
 
@@ -608,7 +611,7 @@ def _unified_test(X, Y, Z, taus=None, K=None, seed=0, config=None,
         return out
     if cfg.comove:
         Ms.append(_comove_block(cX, cY, RX, RY, taus, cfg.comove_parts))
-    if Z.shape[1] > 0 and cfg.across == "cauchy":
+    if cfg.varcorr and Z.shape[1] > 0 and cfg.across == "cauchy":
         # R + Delta per block. With the single-index block on, the base design's smoother
         # stands in for the augmented one.
         from .varcorr import correct_blocks
