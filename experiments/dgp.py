@@ -416,6 +416,129 @@ def tab_mixed(n: int = 2000, seed: int = 1, cardinality: int = 3) -> dict:
 
 
 # --------------------------------------------------------------------------
+# tab:discrete -- a NATIVE DISCRETE world, where a contingency-table test (G^2) is the efficient tool and the
+# natural question is what GFCM's general machinery costs there. X, Y and every Z are categorical; Z drives both
+# X and Y through a logistic model, and the alternative adds a direct X -> Y effect. No continuous variable
+# appears, so G^2 needs no discretisation and is at its best.
+# --------------------------------------------------------------------------
+
+def discrete_cells(n: int = 2000, seed: int = 1, dS: int = 1, K: int = 3, KZ: int = 3,
+                   strength: float = 1.2) -> dict:
+    """null: X _||_ Y | Z with Z a common categorical cause. alt: adds the direct edge X -> Y.
+    A categorical parent's logistic weights are a (levels of the parent) x (categories of the child) matrix."""
+    Z = [f"Z{i}" for i in range(1, dS + 1)]
+    src = {z: categorical_source(KZ) for z in Z}
+
+    def mat(rows, cols, w):                      # level l pushes the child toward category l, cyclically
+        return [[w if (c == l % cols) else 0.0 for c in range(cols)] for l in range(rows)]
+    zw = {z: mat(KZ, K, 0.9) for z in Z}
+    xnode = {"type": "categorical", "cardinality": K, "categorical_model": {"name": "logistic", "weights": dict(zw)}}
+
+    def ynode(with_x):
+        w = dict(zw)
+        if with_x:
+            w["X"] = mat(K, K, strength)
+        return {"type": "categorical", "cardinality": K, "categorical_model": {"name": "logistic", "weights": w}}
+    out = {}
+    for lab, with_x in (("null", False), ("alt", True)):
+        edges = [(z, "X") for z in Z] + [(z, "Y") for z in Z] + ([("X", "Y")] if with_x else [])
+        out[lab] = {"simulation_params": sim_params(n, seed, max_cond=0),
+                    "graph_params": {"type": "custom", "nodes": Z + ["X", "Y"], "edges": edges},
+                    "node_params": {**src, "X": xnode, "Y": ynode(with_x)}}
+    return out
+
+
+# --------------------------------------------------------------------------
+# tab:comove -- the deciding cell for the co-movement block. A latent U drives the SCALE of both X and Y while a
+# conditioned Z drives their MEANS, so X and Y are dependent given Z through co-volatility alone: every default
+# product carries one signed factor and cancels, and only the higher-by-higher product cX.cY survives. Z is present
+# (and conditioned on) so the variance correction is active, which the marginal version in tab_asym cannot do.
+# --------------------------------------------------------------------------
+
+def comove_cells(n: int = 2000, seed: int = 1, dS: int = 1, strength: float = 1.0) -> dict:
+    """null: X _||_ Y | Z truly (independent scales). alt: a shared latent scale driver (co-volatility)."""
+    Z = [f"Z{i}" for i in range(1, dS + 1)]
+
+    def child(scale_parent):
+        # mean linear in Z, conditional std driven by `scale_parent` (listed FIRST so the het func reads it)
+        return {"type": "continuous",
+                "functional_form": {"name": "linear", "weights": {**{z: 0.8 for z in Z}, scale_parent: 0.0}},
+                "noise_model": {"name": "heteroskedastic", "func": "abs_first_parent"}}
+    base_nodes = {z: gaussian_source() for z in Z}
+    cfgs = {}
+    # alternative: ONE shared latent U drives both scales
+    nodes = dict(base_nodes); nodes["U"] = gaussian_source(std=strength)
+    nodes["X"] = child("U"); nodes["Y"] = child("U")
+    cfgs["covol"] = {"simulation_params": sim_params(n, seed, max_cond=0),
+                     "graph_params": {"type": "custom", "nodes": ["U"] + Z + ["X", "Y"],
+                                      "edges": [("U", "X"), ("U", "Y")] + [(z, "X") for z in Z] + [(z, "Y") for z in Z]},
+                     "node_params": nodes}
+    # matched null: TWO independent latents, so the scales move independently and X _||_ Y | Z holds
+    nodes = dict(base_nodes); nodes["U"] = gaussian_source(std=strength); nodes["V"] = gaussian_source(std=strength)
+    nodes["X"] = child("U"); nodes["Y"] = child("V")
+    cfgs["null"] = {"simulation_params": sim_params(n, seed, max_cond=0),
+                    "graph_params": {"type": "custom", "nodes": ["U", "V"] + Z + ["X", "Y"],
+                                     "edges": [("U", "X"), ("V", "Y")] + [(z, "X") for z in Z] + [(z, "Y") for z in Z]},
+                    "node_params": nodes}
+    return cfgs
+
+
+# --------------------------------------------------------------------------
+# tab:mixednative -- the two mixed-type property experiments of the resubmission.
+#   M1 label invariance: the p-value of a native test cannot depend on how the
+#      levels of a nominal variable happen to be numbered.
+#   M2 cardinality: a categorical X whose level means alternate in sign with the
+#      between-level variance held FIXED as K grows, so the signal is constant and
+#      only its spread over levels changes. An integer code makes the best linear
+#      summary of X nearly useless; the K-1 dummy directions each carry the signal.
+# In both, Z drives the level probabilities of X (logistic) and the mean of Y, so
+# the query X _||_ Y | Z is a genuine conditional test rather than a marginal one.
+# --------------------------------------------------------------------------
+
+def _alt_means(K: int, delta: float) -> dict:
+    """Level means +-delta in alternating sign, centred, so the between-level variance is
+    delta^2 for every K and the means are uncorrelated with the level index."""
+    m = [(1.0 if j % 2 == 0 else -1.0) * delta for j in range(K)]
+    c = sum(m) / K
+    return {f"X={j}": m[j] - c for j in range(K)}
+
+
+def mixed_native(n: int = 2000, seed: int = 1, K: int = 3, dS: int = 1, delta: float = 0.0,
+                 cat_in_Z: bool = False) -> dict:
+    """One cell: continuous Z1..ZdS, categorical X (K levels, logistic in Z), continuous Y.
+    delta = 0 is the matched null (no X->Y edge); delta > 0 puts the alternating level means on Y.
+    cat_in_Z=True instead makes Z1 the categorical and X continuous, for the conditioner variant."""
+    Z = [f"Z{i}" for i in range(1, dS + 1)]
+    if cat_in_Z:
+        nodes = {Z[0]: categorical_source(K)}
+        nodes.update({z: gaussian_source() for z in Z[1:]})
+        nodes["X"] = {"type": "continuous", "functional_form": {"name": "stratum_means",
+                                                                "strata_means": {f"{Z[0]}={j}": (1.0 if j % 2 == 0 else -1.0) for j in range(K)},
+                                                                "metric_weights": {z: 0.7 for z in Z[1:]}},
+                      "noise_model": {"name": "additive", "dist": "gaussian", "std": 1.0}}
+        nodes["Y"] = {"type": "continuous", "functional_form": {"name": "stratum_means",
+                                                                "strata_means": {f"{Z[0]}={j}": (-1.0 if j % 2 == 0 else 1.0) for j in range(K)},
+                                                                "metric_weights": {**{z: 0.7 for z in Z[1:]}, **({"X": delta} if delta else {})}},
+                      "noise_model": {"name": "additive", "dist": "gaussian", "std": 1.0}}
+        edges = [(Z[0], "X")] + [(z, "X") for z in Z[1:]] + [(Z[0], "Y")] + [(z, "Y") for z in Z[1:]] + ([("X", "Y")] if delta else [])
+        order = Z + ["X", "Y"]
+    else:
+        nodes = {z: gaussian_source() for z in Z}
+        nodes["X"] = {"type": "categorical", "cardinality": K,
+                      "categorical_model": {"name": "logistic", "weights": {z: [0.0] + [0.8] * (K - 1) for z in Z}}}
+        nodes["Y"] = {"type": "continuous",
+                      "functional_form": {"name": "stratum_means", "strata_means": _alt_means(K, delta),
+                                          "metric_weights": {z: 0.8 for z in Z}},
+                      "noise_model": {"name": "additive", "dist": "gaussian", "std": 1.0}}
+        edges = [(z, "X") for z in Z] + [(z, "Y") for z in Z] + [("X", "Y")]
+        order = Z + ["X", "Y"]
+    sp = sim_params(n, seed, max_cond=0); sp["categorical_parent_metric_form_policy"] = "stratum_means"
+    return {"simulation_params": sp,
+            "graph_params": {"type": "custom", "nodes": order, "edges": edges},
+            "node_params": nodes}
+
+
+# --------------------------------------------------------------------------
 # tab:cardinality -- J=10 pooled vs per-level (categorical X, continuous Y)
 # --------------------------------------------------------------------------
 

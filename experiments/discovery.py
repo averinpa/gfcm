@@ -32,11 +32,18 @@ class CbcdTest:
         return CITestResult(p_value=self(x, y, S))
 
 
-def run_pc(data, nodes, test_callable, alpha=0.05, max_cond_set=None, log=None):
+def run_pc(data, nodes, test_callable, alpha=0.05, max_cond_set=None, log=None, collider="sepset"):
     """Run cbcd PC with a uniform CI test; return the cbcd CPDAG. Pass log=[] to capture every
-    CI decision as (x, y, S, p)."""
+    CI decision as (x, y, S, p).
+
+    collider: "sepset" reads the single recorded separating set (PC as published); "majority" re-tests every
+    conditioning subset of an unshielded triple and orients a collider only when the middle node lies in fewer
+    than half of the separating subsets, leaving the ambiguous triples unoriented (Colombo and Maathuis 2014).
+    The majority rule costs many more CI calls but is order-independent."""
     ci = CbcdTest(test_callable, np.asarray(data).shape[1], log=log)
-    return cbcd.pc(data, ci_test=ci, alpha=alpha, max_cond_set=max_cond_set, var_names=list(nodes))
+    orient = cbcd.collider.MajorityColliderOrienter() if collider == "majority" else None
+    return cbcd.pc(data, ci_test=ci, alpha=alpha, max_cond_set=max_cond_set, var_names=list(nodes),
+                   collider=orient)
 
 
 def cpdag_skeleton(cg, nodes):

@@ -88,7 +88,8 @@ ENV_DS = (1, 2, 3, 5, 8, 10, 15, 20)
 ENV_CELLS = [("calib", "heavy_tail"), ("calib", "hetero"), ("calib", "nonlin_mean"),
              ("calib", "mixed_Z"), ("ladder", "null"),
              ("interdepth", "additive"), ("interdepth", "interaction")]
-ENV_ARMS = {"published": GFCMConfig()}   # the method as submitted
+# as submitted (the submitted CODE: no configuration of gfcm/ reproduces it) | exact corrected
+ENV_ARMS = {"published": adapters.submitted_test, "corrected": GFCMConfig(varcorr_decide=None)}
 
 
 def env_reps(n):
@@ -112,9 +113,10 @@ def rep_envelope(family, cell, dS, n, it):
     rows = []
     for nm, conf in ENV_ARMS.items():
         t0 = time.perf_counter()
-        p = float(unified_test(data[:, xi], data[:, yi], data[:, Si], config=conf,
-                               x_cat=bool(is_cat[xi]), y_cat=bool(is_cat[yi]),
-                               z_cat=(is_cat[Si] if Si else None)))
+        fn, conf = (conf, adapters.PUBLISHED_CONFIG) if callable(conf) else (unified_test, conf)
+        p = float(fn(data[:, xi], data[:, yi], data[:, Si], config=conf,
+                     x_cat=bool(is_cat[xi]), y_cat=bool(is_cat[yi]),
+                     z_cat=(is_cat[Si] if Si else None)))
         rows.append(dict(family=family, cell=cell, dS=dS, n=n, rep=it, arm=nm, pval=p,
                          wall_s=time.perf_counter() - t0))
     pd.DataFrame(rows).to_parquet(outp, index=False)
@@ -142,6 +144,10 @@ def rep_ci(family, cell, dS, n, it, full):
     d = unified_test(data[:, xi], data[:, yi], data[:, Si], x_cat=bool(is_cat[xi]), y_cat=bool(is_cat[yi]),
                      z_cat=(is_cat[Si] if Si else None), detail=True)
     rows.append({**base, "test": "gfcm", "pval": d["p"], "wall_s": time.perf_counter() - t0, **d})
+    t0 = time.perf_counter()                      # the corrected test (no detail path; one p-value)
+    pv = float(unified_test(data[:, xi], data[:, yi], data[:, Si], config=adapters.EXACT, x_cat=bool(is_cat[xi]),
+                            y_cat=bool(is_cat[yi]), z_cat=(is_cat[Si] if Si else None)))
+    rows.append({**base, "test": "gfcm_vc", "pval": pv, "wall_s": time.perf_counter() - t0})
 
     if full:
         for nm in COMPETITORS:

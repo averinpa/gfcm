@@ -36,27 +36,27 @@ class GFCMCITest:
         dict {col: bool} = partial override; None = auto-detect every column once).
     config : GFCMConfig, optional
         GFCM configuration; defaults to the canonical published configuration.
-    taus, K, B, seed :
+    taus, K, seed :
         Optional per-call overrides forwarded to ``unified_test``.
     """
 
     n_vars: int
 
-    def __init__(self, data, cat=None, config=None, taus=None, K=None, B=None, seed=0):
+    def __init__(self, data, cat=None, config=None, taus=None, K=None, seed=0):
         self.data = np.ascontiguousarray(data, dtype=float)
         if self.data.ndim != 2:
             raise ValueError(f"data must be 2-D (n x p), got shape {self.data.shape}")
         self.n_samples, self.n_vars = self.data.shape
         self.config = config if config is not None else GFCMConfig()
         self.is_cat = infer_types(self.data, declared=cat)   # bool[n_vars], resolved ONCE
-        self.taus, self.K, self.B, self.seed = taus, K, B, seed
+        self.taus, self.K, self.seed = taus, K, seed
 
     def __call__(self, x: int, y: int, S: Sequence[int]) -> float:
         """p-value for H0: variable x independent of variable y given the columns in S."""
         S = [int(s) for s in S]
         return unified_test(
             self.data[:, x], self.data[:, y], self.data[:, S],
-            config=self.config, taus=self.taus, K=self.K, B=self.B, seed=self.seed,
+            config=self.config, taus=self.taus, K=self.K, seed=self.seed,
             x_cat=bool(self.is_cat[x]),
             y_cat=bool(self.is_cat[y]),
             z_cat=(self.is_cat[S] if S else None),
